@@ -1,0 +1,8 @@
+accelerate
+scipy
+torch 
+peft
+bitsandbytes
+transformers
+trl
+smart-open
