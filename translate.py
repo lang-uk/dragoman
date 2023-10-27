@@ -10,7 +10,7 @@ model = AutoModelForCausalLM.from_pretrained(
     device_map="auto",
 )
 
-model = PeftModel.from_pretrained(model, "exps/mistral-translate-uk-0.01/checkpoint-1504/")
+model = PeftModel.from_pretrained(model, "exps/mistral-translate-uk-0.01/checkpoint-7524/")
 
 
 generation_config = GenerationConfig(
@@ -39,6 +39,6 @@ def evaluate(instruction, input=None):
 
 
 
-instruction = "Franks grew up in southern California with his father Thurman, his mother Vera, and two younger sisters. Although no one in his family was a musician, his parents loved swing music, and his early influences included Peggy Lee, Nat King Cole, Ira Gershwin, Irving Berlin, and Johnny Mercer. At age 14 Franks bought his first guitar, a Japanese Marco Polo for $29.95 with six private lessons included; those lessons were the only music education that he received."
+instruction = "Ground control to major Tom Commencing countdown, engines on."
 print("Запит:", instruction)
 evaluate(instruction)

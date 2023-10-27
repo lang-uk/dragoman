@@ -1,4 +1,5 @@
 import torch
+from datetime import datetime
 from datasets import load_dataset
 import transformers
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
@@ -9,11 +10,12 @@ MICRO_BATCH_SIZE = 32  # this could actually be 5 but i like powers of 2
 BATCH_SIZE = 128
 GRADIENT_ACCUMULATION_STEPS = BATCH_SIZE // MICRO_BATCH_SIZE
 EPOCHS = 3  # we don't need 3 tbh
-LEARNING_RATE = 3e-4  # the Karpathy constant
+LEARNING_RATE = 2.5e-5
 CUTOFF_LEN = 512  # 1024 accounts for about 99.5% of the data
 LORA_R = 8
 LORA_ALPHA = 16
 LORA_DROPOUT = 0.05
+OUTPUT_MODEL_NAME = "mistral-translate-uk-0.03.full-lora.4bit"
 
 
 # peft_parameters = LoraConfig(
@@ -75,7 +77,16 @@ def main():
     config = LoraConfig(
         r=LORA_R,
         lora_alpha=LORA_ALPHA,
-        target_modules=["q_proj", "v_proj"],
+        target_modules=[
+            "q_proj",
+            "k_proj",
+            "v_proj",
+            "o_proj",
+            "gate_proj",
+            "up_proj",
+            "down_proj",
+            "lm_head",
+        ],
         lora_dropout=LORA_DROPOUT, 
         bias="none",
         task_type="CAUSAL_LM",
@@ -113,10 +124,14 @@ def main():
             num_train_epochs=EPOCHS,
             learning_rate=LEARNING_RATE,
             fp16=True,
-            logging_steps=100,
-            output_dir="exps/mistral-translate-uk-0.01",
+            logging_steps=50,
+            output_dir=f"exps/{OUTPUT_MODEL_NAME}",
             save_total_limit=3,
-            save_strategy="epoch",
+            save_strategy="steps",
+            save_steps=1000,
+            report_to="wandb",
+            run_name=f"{OUTPUT_MODEL_NAME}-{datetime.now().strftime('%Y-%m-%d-%H-%M')}"
+
         ),
         data_collator=transformers.DataCollatorForLanguageModeling(tokenizer, mlm=False, pad_to_multiple_of=1),
     )
@@ -124,7 +139,7 @@ def main():
     trainer.train(resume_from_checkpoint=False)
 
 
-    model.save_pretrained("exps/mistral-translate-uk-0.02.4bit")
+    model.save_pretrained(f"exps/{OUTPUT_MODEL_NAME}")
 
 
 def _mp_fn(index):

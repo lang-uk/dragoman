@@ -6,3 +6,4 @@ bitsandbytes
 transformers
 trl
 smart-open
+wandb
