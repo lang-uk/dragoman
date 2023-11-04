@@ -4,18 +4,22 @@ from datasets import load_dataset
 import transformers
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from peft import prepare_model_for_kbit_training, LoraConfig, get_peft_model
+import os
 
 
-MICRO_BATCH_SIZE = 32  # this could actually be 5 but i like powers of 2
-BATCH_SIZE = 128
+
+os.environ["WANDB_PROJECT"]="finetune_experiments"
+
+MICRO_BATCH_SIZE = 32
+BATCH_SIZE = 256
 GRADIENT_ACCUMULATION_STEPS = BATCH_SIZE // MICRO_BATCH_SIZE
-EPOCHS = 3  # we don't need 3 tbh
-LEARNING_RATE = 2.5e-5
+EPOCHS = 1  # we don't need 3 tbh
+LEARNING_RATE = 5e-5
 CUTOFF_LEN = 512  # 1024 accounts for about 99.5% of the data
 LORA_R = 8
 LORA_ALPHA = 16
 LORA_DROPOUT = 0.05
-OUTPUT_MODEL_NAME = "mistral-translate-uk-0.03.full-lora.4bit"
+OUTPUT_MODEL_NAME = "mistral-instruct-translate-uk-0.05.full-lora.4bit.diff-tokenizer"
 
 
 # peft_parameters = LoraConfig(
@@ -27,20 +31,8 @@ OUTPUT_MODEL_NAME = "mistral-translate-uk-0.03.full-lora.4bit"
 # )
 
 
-model_name = "mistralai/Mistral-7B-v0.1"
+model_name = "mistralai/Mistral-7B-Instruct-v0.1"
 
-
-# data_name = "mlabonne/guanaco-llama2-1k"
-# training_data = load_dataset(data_name, split="train")
-
-# # Model and tokenizer names
-# base_model_name = "NousResearch/Llama-2-7b-chat-hf"
-# refined_model = "llama-2-7b-mlabonne-enhanced" #You can give it your own name
-
-# # Tokenizer
-# llama_tokenizer = AutoTokenizer.from_pretrained(base_model_name, trust_remote_code=True)
-# llama_tokenizer.pad_token = llama_tokenizer.eos_token
-# llama_tokenizer.padding_side = "right"  # Fix for fp16
 
 # Quantization Config
 quant_config = BitsAndBytesConfig(
@@ -50,27 +42,22 @@ quant_config = BitsAndBytesConfig(
     bnb_4bit_use_double_quant=False
 )
 
-# # Model
-# base_model = AutoModelForCausalLM.from_pretrained(
-#     base_model_name,
-#     quantization_config=quant_config,
-#     device_map={"": 0}
-# )
-# base_model.config.use_cache = False
-# base_model.config.pretraining_tp = 1
-
 def main():
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
         quantization_config=quant_config,
-        # load_in_8bit=True,
         device_map="auto",
-        # device_map={'': torch.cuda.current_device()}
-        # device_map={"": 0},
     )
+
     tokenizer = AutoTokenizer.from_pretrained(
-        model_name, add_eos_token=True
+        model_name,
+        model_max_length=1024,
+        use_fast=False,
+        padding_side="left",
+        add_eos_token=True
     )
+    tokenizer.pad_token = tokenizer.eos_token
+    # tokenizer.pad_token_id = 0  # unk. we want this to be different from the eos token
 
     model = prepare_model_for_kbit_training(model)
 
@@ -93,7 +80,6 @@ def main():
     )
 
     model = get_peft_model(model, config)
-    tokenizer.pad_token_id = 0  # unk. we want this to be different from the eos token
 
     data = load_dataset("json", data_files="/tmp/paracrawl.jsonlines", split="train")
 
@@ -126,12 +112,11 @@ def main():
             fp16=True,
             logging_steps=50,
             output_dir=f"exps/{OUTPUT_MODEL_NAME}",
-            save_total_limit=3,
+            save_total_limit=15,
             save_strategy="steps",
-            save_steps=1000,
+            save_steps=50,
             report_to="wandb",
             run_name=f"{OUTPUT_MODEL_NAME}-{datetime.now().strftime('%Y-%m-%d-%H-%M')}"
-
         ),
         data_collator=transformers.DataCollatorForLanguageModeling(tokenizer, mlm=False, pad_to_multiple_of=1),
     )
