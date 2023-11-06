@@ -1,14 +1,19 @@
 import torch
 from datetime import datetime
 from datasets import load_dataset
-import transformers
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from transformers import (
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    BitsAndBytesConfig,
+    DataCollatorForSeq2Seq,
+    TrainingArguments,
+    Trainer,
+)
 from peft import prepare_model_for_kbit_training, LoraConfig, get_peft_model
 import os
 
 
-
-os.environ["WANDB_PROJECT"]="finetune_experiments"
+os.environ["WANDB_PROJECT"] = "finetune_experiments"
 
 MICRO_BATCH_SIZE = 32
 BATCH_SIZE = 256
@@ -19,19 +24,10 @@ CUTOFF_LEN = 512  # 1024 accounts for about 99.5% of the data
 LORA_R = 8
 LORA_ALPHA = 16
 LORA_DROPOUT = 0.05
-OUTPUT_MODEL_NAME = "mistral-instruct-translate-uk-0.05.full-lora.4bit.diff-tokenizer"
+OUTPUT_MODEL_NAME = "mistral-translate-uk-0.06.full-lora.4bit.diff-tokenizer"
 
-
-# peft_parameters = LoraConfig(
-#     lora_alpha=16,
-#     lora_dropout=0.1,
-#     r=8,
-#     bias="none",
-#     task_type="CAUSAL_LM"
-# )
-
-
-model_name = "mistralai/Mistral-7B-Instruct-v0.1"
+# model_name = "mistralai/Mistral-7B-Instruct-v0.1"
+model_name = "mistralai/Mistral-7B-v0.1"
 
 
 # Quantization Config
@@ -39,8 +35,41 @@ quant_config = BitsAndBytesConfig(
     load_in_4bit=True,
     bnb_4bit_quant_type="nf4",
     bnb_4bit_compute_dtype=torch.float16,
-    bnb_4bit_use_double_quant=False
+    bnb_4bit_use_double_quant=False,
 )
+
+# Preparing tokenized version according to the comment
+# https://github.com/huggingface/transformers/issues/22794#issuecomment-1601482558
+
+
+def tokenize(tokenizer, model_input_text: str, splitter: str = "[/INST] "):
+    """Format and tokenize instruction tuning data
+
+    1) Combine the user input (instruction) and agent response
+    2) Create `labels` - ensuring we only fine tune over the
+    desired agent response
+    """
+    orig, translated = model_input_text.split(splitter, 1)
+
+    # Tokenize the full model input
+    model_input = tokenizer(
+        model_input_text, truncation=True, padding=False, return_tensors=None
+    )
+
+    # Create `labels` - ignoring user input (instructions)
+    keep_tokens = tokenizer(translated).input_ids
+    num_tokens_ignore = len(model_input["input_ids"]) - len(keep_tokens)
+    ignored_tokens = [-100] * (num_tokens_ignore)
+    # Copy over the ids for the desired agent response
+    model_input["labels"] = (
+        ignored_tokens + model_input["input_ids"][-len(keep_tokens) :]
+    )
+
+    # Just to demonstrate length equality
+    assert len(model_input["labels"]) == len(model_input["input_ids"])
+
+    return model_input
+
 
 def main():
     model = AutoModelForCausalLM.from_pretrained(
@@ -54,9 +83,11 @@ def main():
         model_max_length=1024,
         use_fast=False,
         padding_side="left",
-        add_eos_token=True
+        add_eos_token=True,
+        add_bos_token=False,
     )
     tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.save_pretrained(OUTPUT_MODEL_NAME)
     # tokenizer.pad_token_id = 0  # unk. we want this to be different from the eos token
 
     model = prepare_model_for_kbit_training(model)
@@ -74,7 +105,7 @@ def main():
             "down_proj",
             "lm_head",
         ],
-        lora_dropout=LORA_DROPOUT, 
+        lora_dropout=LORA_DROPOUT,
         bias="none",
         task_type="CAUSAL_LM",
     )
@@ -90,20 +121,19 @@ def main():
             prompt,
             # truncation=True,
             # max_length=CUTOFF_LEN,
-            #padding=True#"max_length",
+            # padding=True#"max_length",
         )
         return result
-
 
     data = data.shuffle().map(lambda x: tokenize(x["text"]), num_proc=40)
 
     original_size = len(data)
     print(f"Source data size: {original_size}")
 
-    trainer = transformers.Trainer(
+    trainer = Trainer(
         model=model,
         train_dataset=data,
-        args=transformers.TrainingArguments(
+        args=TrainingArguments(
             per_device_train_batch_size=MICRO_BATCH_SIZE,
             gradient_accumulation_steps=GRADIENT_ACCUMULATION_STEPS,
             warmup_steps=100,
@@ -116,13 +146,12 @@ def main():
             save_strategy="steps",
             save_steps=50,
             report_to="wandb",
-            run_name=f"{OUTPUT_MODEL_NAME}-{datetime.now().strftime('%Y-%m-%d-%H-%M')}"
+            run_name=f"{OUTPUT_MODEL_NAME}-{datetime.now().strftime('%Y-%m-%d-%H-%M')}",
         ),
-        data_collator=transformers.DataCollatorForLanguageModeling(tokenizer, mlm=False, pad_to_multiple_of=1),
+        data_collator=DataCollatorForSeq2Seq(tokenizer, pad_to_multiple_of=1),
     )
     model.config.use_cache = False
     trainer.train(resume_from_checkpoint=False)
-
 
     model.save_pretrained(f"exps/{OUTPUT_MODEL_NAME}")
 
@@ -130,6 +159,7 @@ def main():
 def _mp_fn(index):
     # For xla_spawn (TPUs)
     main()
+
 
 if __name__ == "__main__":
     main()

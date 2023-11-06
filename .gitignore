@@ -3,3 +3,4 @@ exps/
 results_modified/
 venv/
 __pycache__/
+wandb/

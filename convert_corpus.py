@@ -43,7 +43,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--template",
-        default="<s>[INST] {orig} [/INST] {translated} </s>",
+        default="[INST] {orig} [/INST] {translated}",
         help="Instruction template"
     )
     parser.add_argument(
