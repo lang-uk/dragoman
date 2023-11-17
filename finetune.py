@@ -1,4 +1,5 @@
 import torch
+from typing import Any, List, Dict, Union, Mapping
 from datetime import datetime
 from datasets import load_dataset
 from transformers import (
@@ -6,9 +7,12 @@ from transformers import (
     AutoTokenizer,
     BitsAndBytesConfig,
     DataCollatorForSeq2Seq,
+    DataCollatorForLanguageModeling,
+    DataCollatorForTokenClassification,
     TrainingArguments,
     Trainer,
 )
+from transformers.data.data_collator import _torch_collate_batch
 from peft import prepare_model_for_kbit_training, LoraConfig, get_peft_model
 import os
 
@@ -24,7 +28,7 @@ CUTOFF_LEN = 512  # 1024 accounts for about 99.5% of the data
 LORA_R = 8
 LORA_ALPHA = 16
 LORA_DROPOUT = 0.05
-OUTPUT_MODEL_NAME = "mistral-translate-uk-0.06.full-lora.4bit.diff-tokenizer"
+OUTPUT_MODEL_NAME = "mistral-translate-uk-0.07.full-lora.4bit.diff-tokenizer"
 
 # model_name = "mistralai/Mistral-7B-Instruct-v0.1"
 model_name = "mistralai/Mistral-7B-v0.1"
@@ -59,36 +63,98 @@ def tokenize(tokenizer, model_input_text: str, splitter: str = "[/INST] "):
     # Create `labels` - ignoring user input (instructions)
     keep_tokens = tokenizer(translated).input_ids
     num_tokens_ignore = len(model_input["input_ids"]) - len(keep_tokens)
-    ignored_tokens = [-100] * (num_tokens_ignore)
+    model_input["num_tokens_ignore"] = [num_tokens_ignore]
+    ignored_tokens = [-100] * num_tokens_ignore
     # Copy over the ids for the desired agent response
     model_input["labels"] = (
         ignored_tokens + model_input["input_ids"][-len(keep_tokens) :]
     )
 
-    # Just to demonstrate length equality
-    assert len(model_input["labels"]) == len(model_input["input_ids"])
+    # # Just to demonstrate length equality
+    # assert len(model_input["labels"]) == len(model_input["input_ids"])
 
     return model_input
 
 
+class RiggedDataCollatorForLanguageModeling(DataCollatorForLanguageModeling):
+    def torch_call(
+        self, examples: List[Union[List[int], Any, Dict[str, Any]]]
+    ) -> Dict[str, Any]:
+        # Handle dict or lists with proper padding and conversion to tensor.
+        if isinstance(examples[0], Mapping):
+            print(examples)
+            batch = self.tokenizer.pad(
+                examples,
+                padding=True,
+                return_tensors="pt",
+                pad_to_multiple_of=self.pad_to_multiple_of,
+            )
+        else:
+            batch = {
+                "input_ids": _torch_collate_batch(
+                    examples, self.tokenizer, pad_to_multiple_of=self.pad_to_multiple_of
+                )
+            }
+
+        print("Here is johynn")
+        print(batch)
+        # labels = batch["input_ids"].clone()
+        # if self.tokenizer.pad_token_id is not None:
+        #     labels[labels == self.tokenizer.pad_token_id] = -100
+        # batch["labels"] += [-100] * (len(batch["input_ids"]) - len(batch["labels"]))
+
+        # ignored_tokens = [-100] * (batch["num_tokens_ignore"])
+        # # # Copy over the ids for the desired agent response
+        # batch["labels"] = (
+        #     ignored_tokens + labels[batch["num_tokens_ignore"]:]
+        # )
+
+        assert len(batch["labels"]) == len(batch["input_ids"])
+        # raise Exception("Fuck you")
+        return batch
+
+
 def main():
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_name,
+        model_max_length=1024,
+        use_fast=False,
+        padding_side="right",
+        add_eos_token=True,
+        add_bos_token=False,
+        # padding=True,
+        # model_input_names=["input_ids", "token_type_ids", "attention_mask", "labels"]
+    )
+    tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.save_pretrained(f"exps/{OUTPUT_MODEL_NAME}")
+    # tokenizer.pad_token_id = 0  # unk. we want this to be different from the eos token
+
+    data = load_dataset("json", data_files="/tmp/paracrawl.jsonlines", split="train")
+
+    data = data.shuffle().map(lambda x: tokenize(tokenizer, x["text"]), num_proc=40)
+    # print(data[0])
+
+
+    # data = data.remove_columns(["text", "num_tokens_ignore"])
+
+    # print(tokenizer.pad(data, return_tensors="pt", pad_to_multiple_of=1,))
+    # collator = DataCollatorForTokenClassification(
+    #     tokenizer, pad_to_multiple_of=1
+    # )
+    # from torch.utils.data import DataLoader
+    # dl = DataLoader(data, batch_size=10, collate_fn=collator)
+
+    # for batch in dl:
+    #     print(batch)
+    #     break
+
+    # return
+
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
         quantization_config=quant_config,
         device_map="auto",
     )
-
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_name,
-        model_max_length=1024,
-        use_fast=False,
-        padding_side="left",
-        add_eos_token=True,
-        add_bos_token=False,
-    )
-    tokenizer.pad_token = tokenizer.eos_token
-    tokenizer.save_pretrained(OUTPUT_MODEL_NAME)
-    # tokenizer.pad_token_id = 0  # unk. we want this to be different from the eos token
 
     model = prepare_model_for_kbit_training(model)
 
@@ -112,21 +178,6 @@ def main():
 
     model = get_peft_model(model, config)
 
-    data = load_dataset("json", data_files="/tmp/paracrawl.jsonlines", split="train")
-
-    def tokenize(prompt):
-        # there's probably a way to do this with the tokenizer settings
-        # but again, gotta move fast
-        result = tokenizer(
-            prompt,
-            # truncation=True,
-            # max_length=CUTOFF_LEN,
-            # padding=True#"max_length",
-        )
-        return result
-
-    data = data.shuffle().map(lambda x: tokenize(x["text"]), num_proc=40)
-
     original_size = len(data)
     print(f"Source data size: {original_size}")
 
@@ -148,7 +199,9 @@ def main():
             report_to="wandb",
             run_name=f"{OUTPUT_MODEL_NAME}-{datetime.now().strftime('%Y-%m-%d-%H-%M')}",
         ),
-        data_collator=DataCollatorForSeq2Seq(tokenizer, pad_to_multiple_of=1),
+        data_collator=DataCollatorForTokenClassification(
+            tokenizer, pad_to_multiple_of=1,
+        ),
     )
     model.config.use_cache = False
     trainer.train(resume_from_checkpoint=False)
