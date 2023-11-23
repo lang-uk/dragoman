@@ -7,14 +7,14 @@ import ctranslate2
 def translate(args):
     generator = ctranslate2.Generator(
         str(args.model),
-        device="auto",
+        device="cpu",
     )
 
     tokenizer = Tokenizer.from_file(str(args.tokenizer))
 
     while True:
         prompt = input("Text to translate: ")
-        prompt = f"[INST] {prompt} [/INST] "
+        prompt = f"[INST] {prompt} [/INST]"
 
         tokens = tokenizer.encode(prompt).tokens
         print(tokens)

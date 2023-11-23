@@ -28,7 +28,7 @@ CUTOFF_LEN = 512  # 1024 accounts for about 99.5% of the data
 LORA_R = 8
 LORA_ALPHA = 16
 LORA_DROPOUT = 0.05
-OUTPUT_MODEL_NAME = "mistral-translate-uk-0.07.full-lora.4bit.diff-tokenizer"
+OUTPUT_MODEL_NAME = "mistral-translate-uk-0.08.lean-lora.4bit.diff-tokenizer"
 
 # model_name = "mistralai/Mistral-7B-Instruct-v0.1"
 model_name = "mistralai/Mistral-7B-v0.1"
@@ -163,13 +163,13 @@ def main():
         lora_alpha=LORA_ALPHA,
         target_modules=[
             "q_proj",
-            "k_proj",
+            # "k_proj",
             "v_proj",
-            "o_proj",
-            "gate_proj",
-            "up_proj",
-            "down_proj",
-            "lm_head",
+            # "o_proj",
+            # "gate_proj",
+            # "up_proj",
+            # "down_proj",
+            # "lm_head",
         ],
         lora_dropout=LORA_DROPOUT,
         bias="none",
