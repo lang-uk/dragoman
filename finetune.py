@@ -1,34 +1,30 @@
 import torch
-from typing import Any, List, Dict, Union, Mapping
 from datetime import datetime
 from datasets import load_dataset
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
     BitsAndBytesConfig,
-    DataCollatorForSeq2Seq,
-    DataCollatorForLanguageModeling,
     DataCollatorForTokenClassification,
     TrainingArguments,
     Trainer,
 )
-from transformers.data.data_collator import _torch_collate_batch
 from peft import prepare_model_for_kbit_training, LoraConfig, get_peft_model
 import os
 
 
 os.environ["WANDB_PROJECT"] = "finetune_experiments"
 
-MICRO_BATCH_SIZE = 32
-BATCH_SIZE = 256
+MICRO_BATCH_SIZE = 24
+BATCH_SIZE = 240
 GRADIENT_ACCUMULATION_STEPS = BATCH_SIZE // MICRO_BATCH_SIZE
 EPOCHS = 1  # we don't need 3 tbh
 LEARNING_RATE = 5e-5
 CUTOFF_LEN = 512  # 1024 accounts for about 99.5% of the data
-LORA_R = 8
-LORA_ALPHA = 16
+LORA_R = 256
+LORA_ALPHA = 512
 LORA_DROPOUT = 0.05
-OUTPUT_MODEL_NAME = "mistral-translate-uk-0.08.lean-lora.4bit.diff-tokenizer"
+OUTPUT_MODEL_NAME = "mistral-translate-uk-0.09.full-lora.big-r.4bit.diff-tokenizer"
 
 # model_name = "mistralai/Mistral-7B-Instruct-v0.1"
 model_name = "mistralai/Mistral-7B-v0.1"
@@ -70,48 +66,8 @@ def tokenize(tokenizer, model_input_text: str, splitter: str = "[/INST] "):
         ignored_tokens + model_input["input_ids"][-len(keep_tokens) :]
     )
 
-    # # Just to demonstrate length equality
-    # assert len(model_input["labels"]) == len(model_input["input_ids"])
 
     return model_input
-
-
-class RiggedDataCollatorForLanguageModeling(DataCollatorForLanguageModeling):
-    def torch_call(
-        self, examples: List[Union[List[int], Any, Dict[str, Any]]]
-    ) -> Dict[str, Any]:
-        # Handle dict or lists with proper padding and conversion to tensor.
-        if isinstance(examples[0], Mapping):
-            print(examples)
-            batch = self.tokenizer.pad(
-                examples,
-                padding=True,
-                return_tensors="pt",
-                pad_to_multiple_of=self.pad_to_multiple_of,
-            )
-        else:
-            batch = {
-                "input_ids": _torch_collate_batch(
-                    examples, self.tokenizer, pad_to_multiple_of=self.pad_to_multiple_of
-                )
-            }
-
-        print("Here is johynn")
-        print(batch)
-        # labels = batch["input_ids"].clone()
-        # if self.tokenizer.pad_token_id is not None:
-        #     labels[labels == self.tokenizer.pad_token_id] = -100
-        # batch["labels"] += [-100] * (len(batch["input_ids"]) - len(batch["labels"]))
-
-        # ignored_tokens = [-100] * (batch["num_tokens_ignore"])
-        # # # Copy over the ids for the desired agent response
-        # batch["labels"] = (
-        #     ignored_tokens + labels[batch["num_tokens_ignore"]:]
-        # )
-
-        assert len(batch["labels"]) == len(batch["input_ids"])
-        # raise Exception("Fuck you")
-        return batch
 
 
 def main():
@@ -122,33 +78,13 @@ def main():
         padding_side="right",
         add_eos_token=True,
         add_bos_token=False,
-        # padding=True,
-        # model_input_names=["input_ids", "token_type_ids", "attention_mask", "labels"]
     )
     tokenizer.pad_token = tokenizer.eos_token
     tokenizer.save_pretrained(f"exps/{OUTPUT_MODEL_NAME}")
-    # tokenizer.pad_token_id = 0  # unk. we want this to be different from the eos token
 
     data = load_dataset("json", data_files="/tmp/paracrawl.jsonlines", split="train")
 
     data = data.shuffle().map(lambda x: tokenize(tokenizer, x["text"]), num_proc=40)
-    # print(data[0])
-
-
-    # data = data.remove_columns(["text", "num_tokens_ignore"])
-
-    # print(tokenizer.pad(data, return_tensors="pt", pad_to_multiple_of=1,))
-    # collator = DataCollatorForTokenClassification(
-    #     tokenizer, pad_to_multiple_of=1
-    # )
-    # from torch.utils.data import DataLoader
-    # dl = DataLoader(data, batch_size=10, collate_fn=collator)
-
-    # for batch in dl:
-    #     print(batch)
-    #     break
-
-    # return
 
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
@@ -163,13 +99,13 @@ def main():
         lora_alpha=LORA_ALPHA,
         target_modules=[
             "q_proj",
-            # "k_proj",
+            "k_proj",
             "v_proj",
-            # "o_proj",
-            # "gate_proj",
-            # "up_proj",
-            # "down_proj",
-            # "lm_head",
+            "o_proj",
+            "gate_proj",
+            "up_proj",
+            "down_proj",
+            "lm_head",
         ],
         lora_dropout=LORA_DROPOUT,
         bias="none",
