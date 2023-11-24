@@ -58,7 +58,7 @@ def export_dataset(args: argparse.Namespace) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        help="Export the dataset from a search index into a CSV file (except the vectors)"
+        description="Export the dataset from a search index into a CSV file (except the vectors)"
     )
     parser.add_argument(
         "output_csv",
