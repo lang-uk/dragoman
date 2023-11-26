@@ -15,16 +15,16 @@ import os
 
 os.environ["WANDB_PROJECT"] = "finetune_experiments"
 
-MICRO_BATCH_SIZE = 24
-BATCH_SIZE = 240
+MICRO_BATCH_SIZE = 16
+BATCH_SIZE = 256
 GRADIENT_ACCUMULATION_STEPS = BATCH_SIZE // MICRO_BATCH_SIZE
 EPOCHS = 1  # we don't need 3 tbh
 LEARNING_RATE = 5e-5
 CUTOFF_LEN = 512  # 1024 accounts for about 99.5% of the data
 LORA_R = 256
-LORA_ALPHA = 512
+LORA_ALPHA = 128
 LORA_DROPOUT = 0.05
-OUTPUT_MODEL_NAME = "mistral-translate-uk-0.09.full-lora.big-r.4bit.diff-tokenizer"
+OUTPUT_MODEL_NAME = "mistral-translate-uk-0.10.full-lora.big-r.small-alpha.4bit.diff-tokenizer"
 
 # model_name = "mistralai/Mistral-7B-Instruct-v0.1"
 model_name = "mistralai/Mistral-7B-v0.1"
@@ -84,7 +84,7 @@ def main():
 
     data = load_dataset("json", data_files="/tmp/paracrawl.jsonlines", split="train")
 
-    data = data.shuffle().map(lambda x: tokenize(tokenizer, x["text"]), num_proc=40)
+    data = data.shuffle(seed=42).map(lambda x: tokenize(tokenizer, x["text"]), num_proc=40)
 
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
