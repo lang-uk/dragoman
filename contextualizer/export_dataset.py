@@ -35,6 +35,7 @@ def export_dataset(args: argparse.Namespace) -> None:
             f,
             fieldnames=["id"] + fields_to_export,
         )
+        writer.writeheader()
 
         for i, record in enumerate(
             tqdm(qs.source(fields_to_export).scan(), total=qs.count())
