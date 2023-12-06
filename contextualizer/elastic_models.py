@@ -17,6 +17,14 @@ detector = gcld3.NNetLanguageIdentifier(min_num_bytes=0, max_num_bytes=1000)
 
 parallel_corpus_idx = Index("parallel_corpus")
 
+def calculate_hash(orig: str, trans: str) -> str:
+    return sha1(f"{orig}:::{trans}".encode("utf-8")).hexdigest()
+
+
+def detect_language(text: str) -> str:
+    result = detector.FindLanguage(text)
+    return f"{result.language}-{result.is_reliable}"
+
 
 @parallel_corpus_idx.document
 class ParallelCorpus(Document):
@@ -35,15 +43,6 @@ class ParallelCorpus(Document):
     detected_from_lang = Keyword()
     detected_to_lang = Keyword()
     hash = Keyword()
-
-    def calculate_hash(self) -> str:
-        return sha1(f"{self.orig}:::{self.trans}".encode("utf-8")).hexdigest()
-
-
-    @classmethod
-    def detect_language(self, text: str) -> str:
-        result = detector.FindLanguage(text)
-        return f"{result.language}-{result.is_reliable}"
 
     @classmethod
     def get_cosine_sbert(cls, query_vector: List[float], limit: int = 8):

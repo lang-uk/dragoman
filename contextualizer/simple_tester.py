@@ -3,10 +3,10 @@ from elasticsearch_dsl import connections
 from sentence_transformers import SentenceTransformer
 
 
-connections.create_connection(hosts=["localhost"], timeout=20)
+connections.create_connection(hosts=["localhost"], timeout=120)
 model = SentenceTransformer("all-mpnet-base-v2")
 
-query = "What is the meaning of life?"
+query = "Weather in Berlin: cold, cloudy and windy"
 embeddings = list(model.encode(query))
 
 

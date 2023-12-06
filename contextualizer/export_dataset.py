@@ -21,6 +21,7 @@ def export_dataset(args: argparse.Namespace) -> None:
     qs = ParallelCorpus.search()
 
     fields_to_export = [
+        "hash",
         "orig",
         "trans",
         "orig_len",
@@ -28,6 +29,8 @@ def export_dataset(args: argparse.Namespace) -> None:
         "labse_distance",
         "orig_ppl",
         "trans_ppl",
+        "detected_from_lang",
+        "detected_to_lang",
     ]
 
     with smart_open.open(args.output_csv, "w") as f:

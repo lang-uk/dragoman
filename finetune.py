@@ -15,7 +15,7 @@ import os
 
 os.environ["WANDB_PROJECT"] = "finetune_experiments"
 
-MICRO_BATCH_SIZE = 16
+MICRO_BATCH_SIZE = 8
 BATCH_SIZE = 256
 GRADIENT_ACCUMULATION_STEPS = BATCH_SIZE // MICRO_BATCH_SIZE
 EPOCHS = 1  # we don't need 3 tbh
@@ -24,10 +24,12 @@ CUTOFF_LEN = 512  # 1024 accounts for about 99.5% of the data
 LORA_R = 256
 LORA_ALPHA = 128
 LORA_DROPOUT = 0.05
-OUTPUT_MODEL_NAME = "mistral-translate-uk-0.10.full-lora.big-r.small-alpha.4bit.diff-tokenizer"
+# OUTPUT_MODEL_NAME = "mistral-translate-uk-0.10.full-lora.big-r.small-alpha.4bit.diff-tokenizer"
+OUTPUT_MODEL_NAME = "llama-translate-uk-0.01.full-lora.big-r.small-alpha.4bit.diff-tokenizer"
 
 # model_name = "mistralai/Mistral-7B-Instruct-v0.1"
-model_name = "mistralai/Mistral-7B-v0.1"
+# model_name = "mistralai/Mistral-7B-v0.1"
+model_name = "huggyllama/llama-7b"
 
 
 # Quantization Config

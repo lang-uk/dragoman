@@ -8,7 +8,7 @@ from itertools import islice
 from tqdm import tqdm
 import smart_open
 import torch
-from elastic_models import ParallelCorpus, parallel_corpus_idx
+from elastic_models import ParallelCorpus, parallel_corpus_idx, calculate_hash, detect_language
 from elasticsearch.helpers import streaming_bulk
 from elasticsearch.client import Elasticsearch
 from elasticsearch_dsl import connections
@@ -150,6 +150,9 @@ def main(args):
                                     text=trans,
                                     device=args.device,
                                 ),
+                                hash = calculate_hash(orig=orig, trans=trans),
+                                detected_from_lang = detect_language(orig),
+                                detected_to_lang = detect_language(trans),
                             ).to_dict(include_meta=True)
                         )
 
