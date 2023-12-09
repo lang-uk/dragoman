@@ -53,6 +53,8 @@ def export_dataset(args: argparse.Namespace) -> None:
                     "labse_distance": record.labse_distance,
                     "orig_ppl": record.orig_ppl,
                     "trans_ppl": record.trans_ppl,
+                    "detected_from_lang": record.detected_from_lang,
+                    "detected_to_lang": record.detected_to_lang,
                 }
             )
 
