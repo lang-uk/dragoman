@@ -24,12 +24,14 @@ CUTOFF_LEN = 512  # 1024 accounts for about 99.5% of the data
 LORA_R = 256
 LORA_ALPHA = 128
 LORA_DROPOUT = 0.05
-# OUTPUT_MODEL_NAME = "mistral-translate-uk-0.10.full-lora.big-r.small-alpha.4bit.diff-tokenizer"
-OUTPUT_MODEL_NAME = "llama-translate-uk-0.01.full-lora.big-r.small-alpha.4bit.diff-tokenizer"
+OUTPUT_MODEL_NAME = (
+    "llama2-translate-uk-0.01.full-lora.big-r.small-alpha.4bit.diff-tokenizer"
+)
 
 # model_name = "mistralai/Mistral-7B-Instruct-v0.1"
 # model_name = "mistralai/Mistral-7B-v0.1"
-model_name = "huggyllama/llama-7b"
+# model_name = "huggyllama/llama-7b"
+model_name = "meta-llama/Llama-2-7b-hf"
 
 
 # Quantization Config
@@ -68,7 +70,6 @@ def tokenize(tokenizer, model_input_text: str, splitter: str = "[/INST] "):
         ignored_tokens + model_input["input_ids"][-len(keep_tokens) :]
     )
 
-
     return model_input
 
 
@@ -86,7 +87,9 @@ def main():
 
     data = load_dataset("json", data_files="/tmp/paracrawl.jsonlines", split="train")
 
-    data = data.shuffle(seed=42).map(lambda x: tokenize(tokenizer, x["text"]), num_proc=40)
+    data = data.shuffle(seed=42).map(
+        lambda x: tokenize(tokenizer, x["text"]), num_proc=40
+    )
 
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
@@ -131,14 +134,15 @@ def main():
             fp16=True,
             logging_steps=50,
             output_dir=f"exps/{OUTPUT_MODEL_NAME}",
-            save_total_limit=15,
+            save_total_limit=5,
             save_strategy="steps",
             save_steps=50,
             report_to="wandb",
             run_name=f"{OUTPUT_MODEL_NAME}-{datetime.now().strftime('%Y-%m-%d-%H-%M')}",
         ),
         data_collator=DataCollatorForTokenClassification(
-            tokenizer, pad_to_multiple_of=1,
+            tokenizer,
+            pad_to_multiple_of=1,
         ),
     )
     model.config.use_cache = False
