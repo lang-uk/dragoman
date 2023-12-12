@@ -4,7 +4,7 @@ import logging
 import argparse
 import csv
 from tqdm import tqdm
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
 from peft import PeftModel
 
 
@@ -38,10 +38,9 @@ if __name__ == "__main__":
         model_max_length=1024,
         use_fast=False,
         padding_side="left",
-        add_eos_token=True,
+        add_eos_token=False,
         add_bos_token=False,
     )
-    tokenizer.pad_token = tokenizer.eos_token
 
     logger.info(f"Loading dataset {args.dataset}")
     dataset: List[Dict] = []
@@ -95,6 +94,9 @@ if __name__ == "__main__":
                     output_scores=True,
                     max_new_tokens=256,
                     use_cache=False,
+                    generation_config=GenerationConfig(
+                        pad_token_id=tokenizer.eos_token_id,
+                    )
                 )
 
                 for s in generation_output.sequences:
