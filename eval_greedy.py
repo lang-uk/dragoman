@@ -82,21 +82,24 @@ if __name__ == "__main__":
             model,
             checkpoint,
         )
+        peft_model = peft_model.merge_and_unload()
 
         with open(output_file, "w", encoding="utf8") as fp_out:
-            w = csv.DictWriter(fp_out, fieldnames=["id", "orig", "reference", "generated"])
+            w = csv.DictWriter(
+                fp_out, fieldnames=["id", "orig", "reference", "generated"]
+            )
             w.writeheader()
 
-            for example in dataset:
+            for example in tqdm(dataset):
                 generation_output = peft_model.generate(
                     input_ids=example["input_ids"],
                     return_dict_in_generate=True,
                     output_scores=True,
                     max_new_tokens=256,
-                    use_cache=False,
+                    use_cache=True,
                     generation_config=GenerationConfig(
                         pad_token_id=tokenizer.eos_token_id,
-                    )
+                    ),
                 )
 
                 for s in generation_output.sequences:
@@ -104,8 +107,10 @@ if __name__ == "__main__":
                     if "[/INST]" in output:
                         _, output = output.split("[/INST]", 1)
                         output = output.replace("<s>", "").replace("</s>", "").strip()
-                    else: # No response
-                        logger.warning(f"Got invalid response for {example['id']}: {output}")
+                    else:  # No response
+                        logger.warning(
+                            f"Got invalid response for {example['id']}: {output}"
+                        )
                         output = ""
 
                     print("Відповідь:", output)
