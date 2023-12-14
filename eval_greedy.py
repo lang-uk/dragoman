@@ -64,8 +64,8 @@ if __name__ == "__main__":
     logger.info(f"Loaded and tokenized {len(dataset)} examples")
     model = AutoModelForCausalLM.from_pretrained(
         args.base_model,
-        device_map="auto",
-    ).half()
+        device_map="cpu",
+    )
 
     logger.info("Loaded base model")
 
@@ -81,8 +81,10 @@ if __name__ == "__main__":
         peft_model = PeftModel.from_pretrained(
             model,
             checkpoint,
+            device_map="cpu",
         )
         peft_model = peft_model.merge_and_unload()
+        peft_model = peft_model.half().cuda()
 
         with open(output_file, "w", encoding="utf8") as fp_out:
             w = csv.DictWriter(
