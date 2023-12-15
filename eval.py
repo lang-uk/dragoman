@@ -26,7 +26,7 @@ if __name__ == "__main__":
     parser.add_argument("--checkpoints", nargs="*")
     parser.add_argument("--output-dir", default="eval")
     parser.add_argument("--dataset", default="data/flores_eng_ukr_major.csv")
-    parser.add_argument("--preset", default="greedy", choices=["greedy"])
+    parser.add_argument("--preset", default="greedy", choices=["greedy", "beam25"])
 
     args = parser.parse_args()
 
@@ -72,7 +72,7 @@ if __name__ == "__main__":
     for checkpoint in tqdm(args.checkpoints):
         logger.info(f"Loading checkpoint {checkpoint}")
         checkpoint_slug = checkpoint.replace("/", "-")
-        output_file = f"{args.output_dir}/{checkpoint_slug}.csv"
+        output_file = f"{args.output_dir}/{checkpoint_slug}.{args.preset}.csv"
 
         if os.path.exists(output_file):
             logger.info(f"Skipping {checkpoint} - already exists")
@@ -88,7 +88,7 @@ if __name__ == "__main__":
 
         with open(output_file, "w", encoding="utf8") as fp_out:
             w = csv.DictWriter(
-                fp_out, fieldnames=["id", "orig", "reference", "generated"]
+                fp_out, fieldnames=["id", "source", "reference", "hypothesis"]
             )
             w.writeheader()
 
@@ -101,6 +101,7 @@ if __name__ == "__main__":
                     use_cache=True,
                     generation_config=GenerationConfig(
                         pad_token_id=tokenizer.eos_token_id,
+                        num_beams=25 if args.preset == "beam25" else 1,
                     ),
                 )
 
@@ -115,12 +116,12 @@ if __name__ == "__main__":
                         )
                         output = ""
 
-                    print("Відповідь:", output)
+                    print(output)
                     w.writerow(
                         {
                             "id": example["id"],
-                            "orig": example["orig"],
+                            "source": example["orig"],
                             "reference": example["trans"],
-                            "generated": output,
+                            "hypothesis": output,
                         }
                     )

@@ -25,13 +25,14 @@ LORA_R = 256
 LORA_ALPHA = 128
 LORA_DROPOUT = 0.05
 OUTPUT_MODEL_NAME = (
-    "mistral-translate-uk-0.11.full-lora.big-r.small-alpha.4bit.diff-tokenizer"
+    "SOLAR-translate-uk-0.02.full-lora.big-r.small-alpha.4bit.diff-tokenizer"
 )
 
 # model_name = "mistralai/Mistral-7B-Instruct-v0.1"
-model_name = "mistralai/Mistral-7B-v0.1"
+# model_name = "mistralai/Mistral-7B-v0.1"
 # model_name = "huggyllama/llama-7b"
 # model_name = "meta-llama/Llama-2-7b-hf"
+model_name = "upstage/SOLAR-10.7B-v1.0"
 
 
 # Quantization Config
