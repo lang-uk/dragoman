@@ -124,4 +124,3 @@ if __name__ == "__main__":
                             "generated": output,
                         }
                     )
-            break
