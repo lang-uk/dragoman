@@ -116,13 +116,13 @@ if __name__ == "__main__":
                         )
                         output = ""
 
-                    print("Відповідь:", output)
+                    print(output)
                     w.writerow(
                         {
                             "id": example["id"],
-                            "orig": example["orig"],
+                            "source": example["orig"],
                             "reference": example["trans"],
-                            "generated": output,
+                            "hypothesis": output,
                         }
                     )
             break
