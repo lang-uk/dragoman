@@ -26,7 +26,7 @@ if __name__ == "__main__":
     parser.add_argument("--checkpoints", nargs="*")
     parser.add_argument("--output-dir", default="eval")
     parser.add_argument("--dataset", default="data/flores_eng_ukr_major.csv")
-    parser.add_argument("--preset", default="greedy", choices=["greedy"])
+    parser.add_argument("--preset", default="greedy", choices=["greedy", "beam25"])
 
     args = parser.parse_args()
 
@@ -101,6 +101,7 @@ if __name__ == "__main__":
                     use_cache=True,
                     generation_config=GenerationConfig(
                         pad_token_id=tokenizer.eos_token_id,
+                        num_beams=25 if args.present == "beam25" else 1,
                     ),
                 )
 
