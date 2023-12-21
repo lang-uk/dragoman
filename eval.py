@@ -26,7 +26,9 @@ if __name__ == "__main__":
     parser.add_argument("--checkpoints", nargs="*")
     parser.add_argument("--output-dir", default="eval")
     parser.add_argument("--dataset", default="data/flores_eng_ukr_major.csv")
-    parser.add_argument("--preset", default="greedy", choices=["greedy", "beam25"])
+    parser.add_argument(
+        "--preset", default="greedy", choices=["greedy", "beam25", "beam15", "beam10"]
+    )
 
     args = parser.parse_args()
 
@@ -92,6 +94,14 @@ if __name__ == "__main__":
             )
             w.writeheader()
 
+            beams = 1
+            if args.preset == "beam25":
+                beams = 25
+            elif args.preset == "beam15":
+                beams = 15
+            elif args.preset == "beam10":
+                beams = 10
+
             for example in tqdm(dataset):
                 generation_output = peft_model.generate(
                     input_ids=example["input_ids"],
@@ -101,7 +111,7 @@ if __name__ == "__main__":
                     use_cache=True,
                     generation_config=GenerationConfig(
                         pad_token_id=tokenizer.eos_token_id,
-                        num_beams=25 if args.preset == "beam25" else 1,
+                        num_beams=beams
                     ),
                 )
 
