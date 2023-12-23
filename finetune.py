@@ -18,21 +18,20 @@ os.environ["WANDB_PROJECT"] = "finetune_experiments"
 MICRO_BATCH_SIZE = 8
 BATCH_SIZE = 256
 GRADIENT_ACCUMULATION_STEPS = BATCH_SIZE // MICRO_BATCH_SIZE
-EPOCHS = 1  # we don't need 3 tbh
+EPOCHS = 1
 LEARNING_RATE = 5e-5
-CUTOFF_LEN = 512  # 1024 accounts for about 99.5% of the data
+CUTOFF_LEN = 512
 LORA_R = 256
 LORA_ALPHA = 128
 LORA_DROPOUT = 0.05
-OUTPUT_MODEL_NAME = (
-    "SOLAR-translate-uk-0.02.full-lora.big-r.small-alpha.4bit.diff-tokenizer"
-)
+OUTPUT_MODEL_NAME = "mistral-translate-uk-0.12.full-lora.4bit.diff-tokenizer.sophiag"
+USE_SOPHIA_G = True
 
 # model_name = "mistralai/Mistral-7B-Instruct-v0.1"
-# model_name = "mistralai/Mistral-7B-v0.1"
+model_name = "mistralai/Mistral-7B-v0.1"
 # model_name = "huggyllama/llama-7b"
 # model_name = "meta-llama/Llama-2-7b-hf"
-model_name = "upstage/SOLAR-10.7B-v1.0"
+# model_name = "upstage/SOLAR-10.7B-v1.0"
 
 
 # Quantization Config
@@ -125,28 +124,41 @@ def main():
     original_size = len(data)
     print(f"Source data size: {original_size}")
 
+    training_args = TrainingArguments(
+        per_device_train_batch_size=MICRO_BATCH_SIZE,
+        gradient_accumulation_steps=GRADIENT_ACCUMULATION_STEPS,
+        warmup_steps=100,
+        num_train_epochs=EPOCHS,
+        learning_rate=LEARNING_RATE,
+        fp16=True,
+        logging_steps=50,
+        output_dir=f"exps/{OUTPUT_MODEL_NAME}",
+        save_total_limit=5,
+        save_strategy="steps",
+        save_steps=50,
+        report_to="wandb",
+        run_name=f"{OUTPUT_MODEL_NAME}-{datetime.now().strftime('%Y-%m-%d-%H-%M')}",
+    )
+
+    if USE_SOPHIA_G:
+        from optimizers.sophia import SophiaG
+
+        optimizer = SophiaG(
+            filter(lambda p: p.requires_grad, model.parameters()),
+            lr=LEARNING_RATE,
+        )
+    else:
+        optimizer = None
+
     trainer = Trainer(
         model=model,
         train_dataset=data,
-        args=TrainingArguments(
-            per_device_train_batch_size=MICRO_BATCH_SIZE,
-            gradient_accumulation_steps=GRADIENT_ACCUMULATION_STEPS,
-            warmup_steps=100,
-            num_train_epochs=EPOCHS,
-            learning_rate=LEARNING_RATE,
-            fp16=True,
-            logging_steps=50,
-            output_dir=f"exps/{OUTPUT_MODEL_NAME}",
-            save_total_limit=5,
-            save_strategy="steps",
-            save_steps=50,
-            report_to="wandb",
-            run_name=f"{OUTPUT_MODEL_NAME}-{datetime.now().strftime('%Y-%m-%d-%H-%M')}",
-        ),
+        args=training_args,
         data_collator=DataCollatorForTokenClassification(
             tokenizer,
             pad_to_multiple_of=1,
         ),
+        optimizers=(optimizer, None),
     )
     model.config.use_cache = False
     trainer.train(resume_from_checkpoint=False)
