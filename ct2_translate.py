@@ -7,7 +7,7 @@ import ctranslate2
 def translate(args):
     generator = ctranslate2.Generator(
         str(args.model),
-        device="cpu",
+        device="cuda",
     )
 
     tokenizer = Tokenizer.from_file(str(args.tokenizer))
