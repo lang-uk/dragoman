@@ -24,7 +24,7 @@ CUTOFF_LEN = 512
 LORA_R = 256
 LORA_ALPHA = 128
 LORA_DROPOUT = 0.05
-OUTPUT_MODEL_NAME = "mistral-translate-uk-0.13.full-lora.4bit.diff-tokenizer.sophiag"
+OUTPUT_MODEL_NAME = "mistral-translate-uk-0.14.full-lora.4bit.diff-tokenizer.sophiag.almost_full_dataset"
 USE_SOPHIA_G = True
 
 # model_name = "mistralai/Mistral-7B-Instruct-v0.1"
@@ -86,12 +86,10 @@ def main():
     tokenizer.save_pretrained(f"exps/{OUTPUT_MODEL_NAME}")
 
     data = load_dataset(
-        "json", data_files="/tmp/paracrawl_filtered.jsonlines", split="train"
+        "json", data_files="/tmp/paracrawl_whole.jsonlines", split="train"
     )
 
-    data = data.shuffle(seed=42).map(
-        lambda x: tokenize(tokenizer, x["text"]), num_proc=40
-    )
+    data = data.map(lambda x: tokenize(tokenizer, x["text"]), num_proc=40)
 
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
