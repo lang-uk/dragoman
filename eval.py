@@ -111,7 +111,8 @@ if __name__ == "__main__":
                     use_cache=True,
                     generation_config=GenerationConfig(
                         pad_token_id=tokenizer.eos_token_id,
-                        num_beams=beams
+                        num_beams=beams,
+                        num_return_sequences=beams
                     ),
                 )
 
