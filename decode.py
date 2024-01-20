@@ -153,6 +153,7 @@ if __name__ == "__main__":
         batch_size=args.batch_size,
         input_columns=columns,
         remove_columns=columns,
+        load_from_cache_file=False,
     )
     dataset.to_json(output_path, force_ascii=False)
 
