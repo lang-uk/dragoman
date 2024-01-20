@@ -158,7 +158,7 @@ if __name__ == "__main__":
     dataset.to_json(output_path, force_ascii=False)
 
     # measure top-1 bleu
-    dataset = dataset.filter(lambda x: x["rank"] == 0)
+    dataset = dataset.filter(lambda x: x["rank"] == 0, load_from_cache_file=False)
     results = sacrebleu.compute(predictions=dataset["hyp"], references=dataset["ref"])
     output_path.with_suffix('.results').write_text(json.dumps(results, ensure_ascii=False))
     print(results)
