@@ -139,7 +139,7 @@ if __name__ == "__main__":
     logger.info(f"Loading checkpoint {args.checkpoint}")
     checkpoint_slug = args.checkpoint.replace("/", "-")
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    output_path = args.output_dir / f"{checkpoint_slug}.beam{args.beams}.jsonl"
+    output_path = args.output_dir / f"{checkpoint_slug}.beam{args.beams}.{args.subset}.jsonl"
 
     translator = BatchTranslator(args)
     dataset = load_dataset("facebook/flores", "eng_Latn-ukr_Cyrl", trust_remote_code=True)[args.subset]
