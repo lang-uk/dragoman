@@ -41,7 +41,7 @@ class BatchTranslator:
 
     @classmethod
     def make_result(cls):
-        return {'id': [], 'rank': [], 'logprob': [], 'src': [], 'hyp': [], 'ref': []}
+        return {'id': [], 'rank': [], 'logprob': [], 'src': [], 'hyp': [], 'ref': [], 'bleu': []}
 
     def load_model(self, args, checkpoint):
         model = AutoModelForCausalLM.from_pretrained(
@@ -121,6 +121,7 @@ class BatchTranslator:
                 result['src'].append(src)
                 result['ref'].append(ref)
                 result['hyp'].append(output)
+                result['bleu'].append(sacrebleu.compute(predictions=[output], references=[ref])['score'])
         return result
 
 
