@@ -1,9 +1,11 @@
 accelerate
-scipy
-torch 
-peft
 bitsandbytes
+evaluate
+peft
+torch
 transformers
 trl
+sacrebleu
+scipy
 smart-open
 wandb
