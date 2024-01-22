@@ -115,7 +115,7 @@ def train(model, dataset, optimizer, args, cooldown=True):
 
     now = time.monotonic()
     for epoch in range(args.epochs):
-        for batch in dataset.iter(batch_size=8):
+        for batch in dataset.shuffle().iter(batch_size=8):
             loss = mce_forward(model, batch)
 
             if loss < 0:
