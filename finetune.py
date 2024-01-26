@@ -24,14 +24,15 @@ CUTOFF_LEN = 512
 LORA_R = 256
 LORA_ALPHA = 128
 LORA_DROPOUT = 0.05
-OUTPUT_MODEL_NAME = "mistral-translate-uk-0.15.full-lora.4bit.diff-tokenizer.sophiag.3m_sorted_dataset"
+OUTPUT_MODEL_NAME = "towerbase-translate-uk-0.16.full-lora.4bit.diff-tokenizer.sophiag.1m_filtered"
 USE_SOPHIA_G = True
 
 # model_name = "mistralai/Mistral-7B-Instruct-v0.1"
-model_name = "mistralai/Mistral-7B-v0.1"
+# model_name = "mistralai/Mistral-7B-v0.1"
 # model_name = "huggyllama/llama-7b"
 # model_name = "meta-llama/Llama-2-7b-hf"
 # model_name = "upstage/SOLAR-10.7B-v1.0"
+model_name = "Unbabel/TowerBase-7B-v0.1"
 
 
 # Quantization Config
@@ -86,10 +87,10 @@ def main():
     tokenizer.save_pretrained(f"exps/{OUTPUT_MODEL_NAME}")
 
     data = load_dataset(
-        "json", data_files="/tmp/paracrawl_3m.jsonlines", split="train"
+        "json", data_files="/tmp/paracrawl_filtered.jsonlines", split="train"
     )
 
-    data = data.map(
+    data = data.shuffle(seed=42).map(
         lambda x: tokenize(tokenizer, x["text"]), num_proc=40
     )
 
