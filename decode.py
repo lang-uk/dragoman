@@ -25,15 +25,14 @@ def batched(iterable, n):
 
 class BatchTranslator:
     def __init__(self, args):
-        self.model = self.load_model(args, args.checkpoint)
-        self.tokenizer = self.load_tokenizer(args)
         self.beams = args.beams
         self.batch_size = args.batch_size
+        self.model = self.load_model(args)
+        self.tokenizer = self.load_tokenizer(args)
 
     @classmethod
     def register(cls, parser):    
-        parser.add_argument("--base_model", default="mistralai/Mistral-7B-v0.1", type=str)
-        parser.add_argument("--checkpoint", help="path to adapter checkpoint", required=True)
+        parser.add_argument("--checkpoint", help="path to adapter checkpoint", type=Path, required=True)
         parser.add_argument("--output_dir", default="eval-beams", type=Path)
         parser.add_argument("--subset", default="devtest", type=str)
         parser.add_argument("--batch_size", default=2, type=int, help="should be small enough to accommodate all beams")
@@ -43,24 +42,28 @@ class BatchTranslator:
     def make_result(cls):
         return {'id': [], 'rank': [], 'logprob': [], 'src': [], 'hyp': [], 'ref': [], 'bleu': []}
 
-    def load_model(self, args, checkpoint):
+    def get_base_model(self, args):
+        return json.loads((args.checkpoint / 'adapter_config.json').read_text())['base_model_name_or_path']
+
+    def load_model(self, args):
         model = AutoModelForCausalLM.from_pretrained(
-            args.base_model,
-            device_map="cpu",
+            self.get_base_model(args),
+            device_map="cuda",
+            torch_dtype=torch.float16,
         )
 
         peft_model = PeftModel.from_pretrained(
             model,
-            checkpoint,
-            device_map="cpu",
+            str(args.checkpoint),
+            device_map="cuda",
         )
         peft_model = peft_model.merge_and_unload()
-        peft_model = peft_model.half().cuda()
+        peft_model = peft_model.half()
         return peft_model
 
     def load_tokenizer(self, args):
         tokenizer = AutoTokenizer.from_pretrained(
-            args.base_model,
+            self.get_base_model(args),
             model_max_length=1024,
             use_fast=False,
             add_eos_token=False,
@@ -89,7 +92,8 @@ class BatchTranslator:
                 pad_token_id=self.tokenizer.bos_token_id,
                 eos_token_id=self.tokenizer.eos_token_id,
                 num_beams=self.beams,
-                num_return_sequences=self.beams
+                num_return_sequences=self.beams,
+                #num_beam_groups=self.beams//5,
             ),
         )
 
@@ -137,7 +141,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     logger.info(f"Loading checkpoint {args.checkpoint}")
-    checkpoint_slug = args.checkpoint.replace("/", "-")
+    checkpoint_slug = str(args.checkpoint).replace("/", "-")
     args.output_dir.mkdir(parents=True, exist_ok=True)
     output_path = args.output_dir / f"{checkpoint_slug}.beam{args.beams}.{args.subset}.jsonl"
 
