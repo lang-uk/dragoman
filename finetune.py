@@ -19,12 +19,12 @@ MICRO_BATCH_SIZE = 8
 BATCH_SIZE = 256
 GRADIENT_ACCUMULATION_STEPS = BATCH_SIZE // MICRO_BATCH_SIZE
 EPOCHS = 1
-LEARNING_RATE = 2e-5
+LEARNING_RATE = 5e-5
 CUTOFF_LEN = 512
 LORA_R = 256
 LORA_ALPHA = 128
 LORA_DROPOUT = 0.05
-OUTPUT_MODEL_NAME = "towerbase-translate-uk-0.16.full-lora.4bit.diff-tokenizer.sophiag.1m_filtered"
+OUTPUT_MODEL_NAME = "towerbase-translate-uk-0.17.full-lora.4bit.diff-tokenizer.sophiag.1m_filtered"
 USE_SOPHIA_G = True
 
 # model_name = "mistralai/Mistral-7B-Instruct-v0.1"
