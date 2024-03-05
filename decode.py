@@ -9,7 +9,7 @@ from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
 from transformers.generation import BeamSearchDecoderOnlyOutput
 from peft import PeftModel
-
+import torch
 sacrebleu = evaluate.load("sacrebleu")
 logger = logging.getLogger(__name__)
 
@@ -146,7 +146,7 @@ if __name__ == "__main__":
     output_path = args.output_dir / f"{checkpoint_slug}.beam{args.beams}.{args.subset}.jsonl"
 
     translator = BatchTranslator(args)
-    dataset = load_dataset("facebook/flores", "eng_Latn-ukr_Cyrl", trust_remote_code=True)[args.subset]
+    dataset = load_dataset("facebook/flores", "eng_Latn-ukr_Cyrl")[args.subset]
     #dataset = dataset.select(range(10)) # for testing
 
     columns = ["id", "sentence_eng_Latn", "sentence_ukr_Cyrl"]

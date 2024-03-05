@@ -22,17 +22,17 @@ EPOCHS = 1
 LEARNING_RATE = 2e-5
 CUTOFF_LEN = 512
 LORA_R = 256
-LORA_ALPHA = 128
+LORA_ALPHA = 512
 LORA_DROPOUT = 0.05
-OUTPUT_MODEL_NAME = "towerbase-translate-uk-0.19.full-lora.4bit.diff-tokenizer.sophiag.3m_filtered"
+OUTPUT_MODEL_NAME = "mistral-translate-uk-0.21.full-lora.4bit.diff-tokenizer.bigger-alpha.sophiag.3m_filtered"
 USE_SOPHIA_G = True
 
 # model_name = "mistralai/Mistral-7B-Instruct-v0.1"
-# model_name = "mistralai/Mistral-7B-v0.1"
+model_name = "mistralai/Mistral-7B-v0.1"
 # model_name = "huggyllama/llama-7b"
 # model_name = "meta-llama/Llama-2-7b-hf"
 # model_name = "upstage/SOLAR-10.7B-v1.0"
-model_name = "Unbabel/TowerBase-7B-v0.1"
+# model_name = "Unbabel/TowerBase-7B-v0.1"
 
 
 # Quantization Config
@@ -162,7 +162,7 @@ def main():
         optimizers=(optimizer, None),
     )
     model.config.use_cache = False
-    trainer.train(resume_from_checkpoint=True)
+    trainer.train(resume_from_checkpoint=False)
 
     model.save_pretrained(f"exps/{OUTPUT_MODEL_NAME}")
 
