@@ -16,8 +16,6 @@ import wandb
 
 from decode import BatchTranslator, Prompter
 
-os.environ["WANDB_PROJECT"] = "finetune_experiments"
-
 parser = argparse.ArgumentParser(
     "train loop", formatter_class=argparse.ArgumentDefaultsHelpFormatter
 )
@@ -101,6 +99,8 @@ def tokenize(tokenizer, model_input_text: str, sep: str = "[/INST] "):
 
 
 def main():
+    wandb.init(project="finetune_experiments", config=vars(args))
+
     tokenizer = AutoTokenizer.from_pretrained(
         args.model_name_or_path,
         model_max_length=args.model_max_length,
