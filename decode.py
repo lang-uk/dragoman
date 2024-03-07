@@ -50,8 +50,8 @@ class BatchTranslator:
     @classmethod
     def from_args(cls, args):
         return cls(
-            beams=args.decode_beams,
-            batch_size=args.decode_batch_size,
+            decode_beams=args.decode_beams,
+            decode_batch_size=args.decode_batch_size,
             model=cls.load_model(args),
             tokenizer=cls.load_tokenizer(cls.get_base_model(args)),
             prompter=Prompter(args.prompt),
@@ -83,8 +83,9 @@ class BatchTranslator:
     @classmethod
     def get_base_model(self, args):
         path = Path(args.model_name_or_path)
+        exp = Path(args.exp)
         if path.is_dir():
-            return json.loads((path / 'adapter_config.json').read_text())['base_model_name_or_path']
+            return json.loads((exp / 'adapter_config.json').read_text())['base_model_name_or_path']
         else:
             return args.model_name_or_path
 
@@ -98,7 +99,7 @@ class BatchTranslator:
 
         peft_model = PeftModel.from_pretrained(
             model,
-            args.model_name_or_path,
+            args.exp,
             device_map="cuda",
         )
         peft_model = peft_model.merge_and_unload()
@@ -172,7 +173,7 @@ class BatchTranslator:
         return result
 
     def decode_flores(self, exp: str, decode_subset: str, indices=None):
-        dataset = load_dataset("facebook/flores", "eng_Latn-ukr_Cyrl", trust_remote_code=True)[decode_subset]
+        dataset = load_dataset("facebook/flores", "eng_Latn-ukr_Cyrl")[decode_subset]
         if indices is not None:
             dataset = dataset.select(indices)
         columns = ["id", "sentence_eng_Latn", "sentence_ukr_Cyrl"]
@@ -207,4 +208,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     translator = BatchTranslator.from_args(args)
-    translator.decode(exp=args.exp, decode_subset=args.decode_subset)
+    translator.decode_flores(exp=args.exp, decode_subset=args.decode_subset)
