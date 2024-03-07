@@ -50,7 +50,7 @@ class BatchTranslator:
     @classmethod
     def from_args(cls, args):
         return cls(
-            beams=args.beams,
+            beams=args.decode_beams,
             batch_size=args.decode_batch_size,
             model=cls.load_model(args),
             tokenizer=cls.load_tokenizer(cls.get_base_model(args)),
