@@ -200,6 +200,7 @@ def main():
     if args.decode_beams:
         print('Decoding FLORES', args.decode_subset)
         model = model.merge_and_unload()
+        model.gradient_checkpointing_disable()
         translator = BatchTranslator(
             decode_beams=args.decode_beams,
             decode_batch_size=args.decode_batch_size,

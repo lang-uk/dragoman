@@ -118,6 +118,7 @@ class BatchTranslator:
         )
         return tokenizer
 
+    @torch.inference_mode()
     def __call__(self, ids, sources, references):
         inputs = self.tokenizer(
             [self.prompter.generate_prompt(source) for source in sources],
