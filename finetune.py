@@ -12,6 +12,7 @@ from transformers import (
 )
 from peft import prepare_model_for_kbit_training, LoraConfig, get_peft_model
 import os
+import wandb
 
 from decode import BatchTranslator, Prompter
 
@@ -197,8 +198,8 @@ def main():
         model.save_pretrained(args.exp)
 
     if args.decode_beams:
+        print('Decoding FLORES', args.decode_subset)
         model = model.merge_and_unload()
-        print(model)
         translator = BatchTranslator(
             decode_beams=args.decode_beams,
             decode_batch_size=args.decode_batch_size,
@@ -206,7 +207,13 @@ def main():
             tokenizer=BatchTranslator.load_tokenizer(BatchTranslator.get_base_model(args)),
             prompter=prompter
         )
-        translator.decode_flores(decode_subset=args.decode_subset)
+        results = translator.decode_flores(exp=args.exp, decode_subset=args.decode_subset)
+        #results = translator.decode_flores(exp=args.exp, decode_subset=args.decode_subset, indices=range(2))
+        wandb.log({
+            'decode/bleu': results['score'],
+            'decode/ref_len': results['ref_len'],
+            'decode/hyp_len': results['hyp_len'],
+        })
 
 
 def _mp_fn(index):

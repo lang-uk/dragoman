@@ -1,7 +1,6 @@
 import argparse
 from itertools import islice
 import json
-import logging
 from pathlib import Path
 
 import evaluate
@@ -11,7 +10,6 @@ from transformers.generation import BeamSearchDecoderOnlyOutput
 from peft import PeftModel
 import torch
 sacrebleu = evaluate.load("sacrebleu")
-logger = logging.getLogger(__name__)
 
 
 def batched(iterable, n):
@@ -130,7 +128,7 @@ class BatchTranslator:
             input_ids=inputs["input_ids"].cuda(),
             return_dict_in_generate=True,
             output_scores=True,
-            max_new_tokens=64,
+            max_new_tokens=256,
             use_cache=True,
             generation_config=GenerationConfig(
                 pad_token_id=self.tokenizer.bos_token_id,
@@ -172,9 +170,10 @@ class BatchTranslator:
                 result['bleu'].append(sacrebleu.compute(predictions=[output], references=[ref])['score'])
         return result
 
-    def decode_flores(self, decode_subset):
-        dataset = load_dataset("facebook/flores", "eng_Latn-ukr_Cyrl")[decode_subset]
-        #dataset = dataset.select(range(10)) # for testing
+    def decode_flores(self, exp: str, decode_subset: str, indices=None):
+        dataset = load_dataset("facebook/flores", "eng_Latn-ukr_Cyrl", trust_remote_code=True)[decode_subset]
+        if indices is not None:
+            dataset = dataset.select(indices)
         columns = ["id", "sentence_eng_Latn", "sentence_ukr_Cyrl"]
         dataset = dataset.select_columns(columns)
         dataset = dataset.map(
@@ -186,7 +185,7 @@ class BatchTranslator:
             load_from_cache_file=False,
         )
 
-        exp = Path(args.exp)
+        exp = Path(exp)
         exp.mkdir(parents=True, exist_ok=True)
         output_path = exp / f"beam{self.decode_beams}.{decode_subset}.jsonl"
 
@@ -198,21 +197,13 @@ class BatchTranslator:
         output_path.with_suffix('.results').write_text(json.dumps(results, ensure_ascii=False))
         print(results)
 
-        return dataset
+        return results
 
 
 if __name__ == "__main__":
-    logging.basicConfig(
-        format="%(asctime)s %(levelname)-8s %(message)s",
-        level=logging.INFO,
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-
     parser = argparse.ArgumentParser()
     BatchTranslator.register(parser)
     args = parser.parse_args()
 
-    logger.info(f"Loading checkpoint {args.checkpoint}")
-
     translator = BatchTranslator.from_args(args)
-    translator.decode(decode_subset=args.decode_subset)
+    translator.decode(exp=args.exp, decode_subset=args.decode_subset)
