@@ -200,6 +200,7 @@ def main():
     if args.decode_beams:
         print('Decoding FLORES', args.decode_subset)
         model = model.merge_and_unload()
+        # TODO: maybe convert the whole thing to float16?
         model.gradient_checkpointing_disable()
         translator = BatchTranslator(
             decode_beams=args.decode_beams,
@@ -213,7 +214,7 @@ def main():
         wandb.log({
             'decode/bleu': results['score'],
             'decode/ref_len': results['ref_len'],
-            'decode/hyp_len': results['hyp_len'],
+            'decode/hyp_len': results['sys_len'],
         })
 
 
