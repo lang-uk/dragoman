@@ -64,7 +64,7 @@ class BatchTranslator:
     def load_tokenizer(self, args):
         tokenizer = AutoTokenizer.from_pretrained(
             self.get_base_model(args),
-            model_max_length=1024,
+            model_max_length=2048,
             use_fast=False,
             add_eos_token=False,
             add_bos_token=False,
@@ -74,7 +74,10 @@ class BatchTranslator:
         return tokenizer
 
     def generate_prompt(self, instructions: list[str]) -> list[str]:
-        return [f"[INST] {instruction} [/INST]" for instruction in instructions]
+        return [
+            f"Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request. ### Instruction: Respond with Ukrainian translations of English input. ### Input: {instruction} ### Response: "
+            for instruction in instructions
+        ]
 
     def __call__(self, ids, sources, references):
         inputs = self.tokenizer(
@@ -101,7 +104,7 @@ class BatchTranslator:
             outputs.sequences, outputs.scores, outputs.beam_indices,
             normalize_logits=True
         ).sum(dim=-1)
-        #output_length = np.sum(transition_scores.numpy() < 0, axis=1)
+        # output_length = np.sum(transition_scores.numpy() < 0, axis=1)
 
         strings = self.tokenizer.batch_decode(outputs.sequences, skip_special_tokens=True)
 

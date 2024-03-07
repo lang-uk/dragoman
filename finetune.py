@@ -15,24 +15,25 @@ import os
 
 os.environ["WANDB_PROJECT"] = "finetune_experiments"
 
-MICRO_BATCH_SIZE = 8
+MICRO_BATCH_SIZE = 4
 BATCH_SIZE = 256
 GRADIENT_ACCUMULATION_STEPS = BATCH_SIZE // MICRO_BATCH_SIZE
 EPOCHS = 1
 LEARNING_RATE = 2e-5
-CUTOFF_LEN = 512
+CUTOFF_LEN = 2048
 LORA_R = 256
 LORA_ALPHA = 512
 LORA_DROPOUT = 0.05
-OUTPUT_MODEL_NAME = "mistral-translate-uk-0.21.full-lora.4bit.diff-tokenizer.bigger-alpha.sophiag.3m_filtered"
+OUTPUT_MODEL_NAME = "gemma2b-translate-uk-0.22.full-lora.4bit.diff-tokenizer.bigger-alpha.sophiag.1m_filtered"
 USE_SOPHIA_G = True
 
 # model_name = "mistralai/Mistral-7B-Instruct-v0.1"
-model_name = "mistralai/Mistral-7B-v0.1"
+# model_name = "mistralai/Mistral-7B-v0.1"
 # model_name = "huggyllama/llama-7b"
 # model_name = "meta-llama/Llama-2-7b-hf"
 # model_name = "upstage/SOLAR-10.7B-v1.0"
 # model_name = "Unbabel/TowerBase-7B-v0.1"
+model_name = "google/gemma-2b"
 
 
 # Quantization Config
@@ -77,7 +78,7 @@ def tokenize(tokenizer, model_input_text: str, splitter: str = "[/INST] "):
 def main():
     tokenizer = AutoTokenizer.from_pretrained(
         model_name,
-        model_max_length=1024,
+        model_max_length=CUTOFF_LEN,
         use_fast=False,
         padding_side="right",
         add_eos_token=True,
@@ -87,11 +88,13 @@ def main():
     tokenizer.save_pretrained(f"exps/{OUTPUT_MODEL_NAME}")
 
     data = load_dataset(
-        "json", data_files="./data/processed/paracrawl_3m.jsonlines", split="train"
+        "json",
+        data_files="./data/processed/paracrawl_filtered_alpaca.jsonlines",
+        split="train",
     )
 
     data = data.map(
-        lambda x: tokenize(tokenizer, x["text"]), num_proc=40
+        lambda x: tokenize(tokenizer, x["text"], splitter="### Response:"), num_proc=40
     )
 
     model = AutoModelForCausalLM.from_pretrained(
