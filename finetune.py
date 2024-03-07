@@ -1,3 +1,4 @@
+import argparse
 import torch
 from datetime import datetime
 from datasets import load_dataset
@@ -12,28 +13,65 @@ from transformers import (
 from peft import prepare_model_for_kbit_training, LoraConfig, get_peft_model
 import os
 
-
 os.environ["WANDB_PROJECT"] = "finetune_experiments"
 
-MICRO_BATCH_SIZE = 4
-BATCH_SIZE = 256
-GRADIENT_ACCUMULATION_STEPS = BATCH_SIZE // MICRO_BATCH_SIZE
-EPOCHS = 1
-LEARNING_RATE = 2e-5
-CUTOFF_LEN = 2048
-LORA_R = 256
-LORA_ALPHA = 512
-LORA_DROPOUT = 0.05
-OUTPUT_MODEL_NAME = "gemma2b-translate-uk-0.22.full-lora.4bit.diff-tokenizer.bigger-alpha.sophiag.1m_filtered"
-USE_SOPHIA_G = True
-
-# model_name = "mistralai/Mistral-7B-Instruct-v0.1"
-# model_name = "mistralai/Mistral-7B-v0.1"
-# model_name = "huggyllama/llama-7b"
-# model_name = "meta-llama/Llama-2-7b-hf"
-# model_name = "upstage/SOLAR-10.7B-v1.0"
-# model_name = "Unbabel/TowerBase-7B-v0.1"
-model_name = "google/gemma-2b"
+parser = argparse.ArgumentParser(
+    "train loop", formatter_class=argparse.ArgumentDefaultsHelpFormatter
+)
+parser.add_argument(
+    "--model_name_or_path",
+    default="google/gemma-2b",
+    type=str,
+    help="Base model name, HuggingFace or local path. Example options: mistralai/Mistral-7B-Instruct-v0.1 mistralai/Mistral-7B-v0.1 huggyllama/llama-7b meta-llama/Llama-2-7b-hf upstage/SOLAR-10.7B-v1.0 Unbabel/TowerBase-7B-v0.1",
+)
+parser.add_argument(
+    "--train",
+    default="data/processed/paracrawl_filtered_alpaca.jsonlines",
+    type=str,
+    help="A jsonlines file containing the training data.",
+)
+parser.add_argument(
+    "--separator",
+    default="### Response:",
+    type=str,
+    help="Separator between user input and agent response.",
+)
+parser.add_argument(
+    "--exp",
+    default="exps/gemma2b-translate-uk-0.22.full-lora.4bit.diff-tokenizer.bigger-alpha.sophiag.1m_filtered",
+    type=str,
+    help="experiment directory: where to save the model",
+)
+parser.add_argument(
+    "--optimizer",
+    default="adamw",
+    choices=["sophiag", "adamw"],
+    type=str,
+    help="Optimizer.",
+)
+parser.add_argument(
+    "--per_device_train_batch_size", default=4, type=int, help="Batch size per device."
+)
+parser.add_argument(
+    "--gradient_accumulation_steps",
+    default=64,
+    type=int,
+    help="Gradient accumulation steps.",
+)
+parser.add_argument("--learning_rate", default=2e-5, type=float, help="Learning rate.")
+parser.add_argument("--lora_rank", default=256, type=int, help="LoRA adapter rank.")
+parser.add_argument("--lora_alpha", default=512, type=int, help="LoRA alpha.")
+parser.add_argument("--lora_dropout", default=0.05, type=float, help="LoRA dropout.")
+parser.add_argument(
+    "--model_max_length", default=2048, type=int, help="Maximum model input length."
+)
+parser.add_argument(
+    "--save_steps", default=50, type=int, help="Save checkpoints every X steps."
+)
+parser.add_argument(
+    "--save_total_limit", default=5, type=int, help="Limit the total amount of checkpoints."
+)
+args = parser.parse_args()
 
 
 # Quantization Config
@@ -48,14 +86,14 @@ quant_config = BitsAndBytesConfig(
 # https://github.com/huggingface/transformers/issues/22794#issuecomment-1601482558
 
 
-def tokenize(tokenizer, model_input_text: str, splitter: str = "[/INST] "):
+def tokenize(tokenizer, model_input_text: str, sep: str = "[/INST] "):
     """Format and tokenize instruction tuning data
 
     1) Combine the user input (instruction) and agent response
     2) Create `labels` - ensuring we only fine tune over the
     desired agent response
     """
-    orig, translated = model_input_text.split(splitter, 1)
+    orig, translated = model_input_text.split(sep, 1)
 
     # Tokenize the full model input
     model_input = tokenizer(
@@ -77,28 +115,33 @@ def tokenize(tokenizer, model_input_text: str, splitter: str = "[/INST] "):
 
 def main():
     tokenizer = AutoTokenizer.from_pretrained(
-        model_name,
-        model_max_length=CUTOFF_LEN,
+        args.model_name_or_path,
+        model_max_length=args.model_max_length,
         use_fast=False,
         padding_side="right",
         add_eos_token=True,
         add_bos_token=False,
     )
     tokenizer.pad_token = tokenizer.eos_token
-    tokenizer.save_pretrained(f"exps/{OUTPUT_MODEL_NAME}")
+    tokenizer.save_pretrained(args.exp)
 
     data = load_dataset(
         "json",
-        data_files="./data/processed/paracrawl_filtered_alpaca.jsonlines",
+        data_files=args.train,
         split="train",
     )
 
+    print("Loading data from:", args.train + ", found", len(data), "examples")
+    print("Training example:", data[0])
+    print("Using separator for conditional LM training:", args.separator)
+
     data = data.map(
-        lambda x: tokenize(tokenizer, x["text"], splitter="### Response:"), num_proc=40
+        lambda x: tokenize(tokenizer, x["text"], sep=args.separator), num_proc=40,
+        desc="Tokenizing"
     )
 
     model = AutoModelForCausalLM.from_pretrained(
-        model_name,
+        args.model_name_or_path,
         quantization_config=quant_config,
         device_map="auto",
     )
@@ -106,8 +149,8 @@ def main():
     model = prepare_model_for_kbit_training(model)
 
     config = LoraConfig(
-        r=LORA_R,
-        lora_alpha=LORA_ALPHA,
+        r=args.lora_rank,
+        lora_alpha=args.lora_alpha,
         target_modules=[
             "q_proj",
             "k_proj",
@@ -118,38 +161,35 @@ def main():
             "down_proj",
             "lm_head",
         ],
-        lora_dropout=LORA_DROPOUT,
+        lora_dropout=args.lora_dropout,
         bias="none",
         task_type="CAUSAL_LM",
     )
 
     model = get_peft_model(model, config)
 
-    original_size = len(data)
-    print(f"Source data size: {original_size}")
-
     training_args = TrainingArguments(
-        per_device_train_batch_size=MICRO_BATCH_SIZE,
-        gradient_accumulation_steps=GRADIENT_ACCUMULATION_STEPS,
+        per_device_train_batch_size=args.per_device_train_batch_size,
+        gradient_accumulation_steps=args.gradient_accumulation_steps,
         warmup_steps=100,
-        num_train_epochs=EPOCHS,
-        learning_rate=LEARNING_RATE,
+        num_train_epochs=1,
+        learning_rate=args.learning_rate,
         fp16=True,
         logging_steps=50,
-        output_dir=f"exps/{OUTPUT_MODEL_NAME}",
-        save_total_limit=5,
+        output_dir=args.exp,
+        save_total_limit=args.save_total_limit,
         save_strategy="steps",
-        save_steps=50,
+        save_steps=args.save_steps,
         report_to="wandb",
-        run_name=f"{OUTPUT_MODEL_NAME}-{datetime.now().strftime('%Y-%m-%d-%H-%M')}",
+        run_name=f"{args.exp}-{datetime.now().strftime('%Y-%m-%d-%H-%M')}",
     )
 
-    if USE_SOPHIA_G:
+    if args.optimizer == "sophiag":
         from optimizers.sophia import SophiaG
 
         optimizer = SophiaG(
             filter(lambda p: p.requires_grad, model.parameters()),
-            lr=LEARNING_RATE,
+            lr=args.learning_rate,
         )
     else:
         optimizer = None
@@ -167,7 +207,7 @@ def main():
     model.config.use_cache = False
     trainer.train(resume_from_checkpoint=False)
 
-    model.save_pretrained(f"exps/{OUTPUT_MODEL_NAME}")
+    model.save_pretrained(args.exp)
 
 
 def _mp_fn(index):
