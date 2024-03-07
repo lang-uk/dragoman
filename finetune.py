@@ -13,34 +13,18 @@ from transformers import (
 from peft import prepare_model_for_kbit_training, LoraConfig, get_peft_model
 import os
 
+from decode import BatchTranslator, Prompter
+
 os.environ["WANDB_PROJECT"] = "finetune_experiments"
 
 parser = argparse.ArgumentParser(
     "train loop", formatter_class=argparse.ArgumentDefaultsHelpFormatter
 )
 parser.add_argument(
-    "--model_name_or_path",
-    default="google/gemma-2b",
-    type=str,
-    help="Base model name, HuggingFace or local path. Example options: mistralai/Mistral-7B-Instruct-v0.1 mistralai/Mistral-7B-v0.1 huggyllama/llama-7b meta-llama/Llama-2-7b-hf upstage/SOLAR-10.7B-v1.0 Unbabel/TowerBase-7B-v0.1",
-)
-parser.add_argument(
     "--train",
     default="data/processed/paracrawl_filtered_alpaca.jsonlines",
     type=str,
     help="A jsonlines file containing the training data.",
-)
-parser.add_argument(
-    "--separator",
-    default="### Response:",
-    type=str,
-    help="Separator between user input and agent response.",
-)
-parser.add_argument(
-    "--exp",
-    default="exps/gemma2b-translate-uk-0.22.full-lora.4bit.diff-tokenizer.bigger-alpha.sophiag.1m_filtered",
-    type=str,
-    help="experiment directory: where to save the model",
 )
 parser.add_argument(
     "--optimizer",
@@ -71,7 +55,9 @@ parser.add_argument(
 parser.add_argument(
     "--save_total_limit", default=5, type=int, help="Limit the total amount of checkpoints."
 )
+BatchTranslator.register(parser) # --exp, --prompt are here
 args = parser.parse_args()
+prompter = Prompter(args.prompt)
 
 
 # Quantization Config
@@ -132,11 +118,11 @@ def main():
     )
 
     print("Loading data from:", args.train + ", found", len(data), "examples")
-    print("Training example:", data[0])
-    print("Using separator for conditional LM training:", args.separator)
+    print("First training example:", data[0])
+    print("Using separator for conditional LM training:", prompter.separator)
 
     data = data.map(
-        lambda x: tokenize(tokenizer, x["text"], sep=args.separator), num_proc=40,
+        lambda x: tokenize(tokenizer, x["text"], sep=prompter.separator), num_proc=40,
         desc="Tokenizing"
     )
 
@@ -207,7 +193,20 @@ def main():
     model.config.use_cache = False
     trainer.train(resume_from_checkpoint=False)
 
-    model.save_pretrained(args.exp)
+    if args.save_total_limit > 0:
+        model.save_pretrained(args.exp)
+
+    if args.decode_beams:
+        model = model.merge_and_unload()
+        print(model)
+        translator = BatchTranslator(
+            decode_beams=args.decode_beams,
+            decode_batch_size=args.decode_batch_size,
+            model=model,
+            tokenizer=BatchTranslator.load_tokenizer(BatchTranslator.get_base_model(args)),
+            prompter=prompter
+        )
+        translator.decode_flores(decode_subset=args.decode_subset)
 
 
 def _mp_fn(index):
