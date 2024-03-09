@@ -173,7 +173,9 @@ class BatchTranslator:
         return result
 
     def decode_flores(self, exp: str, decode_subset: str, indices=None):
-        dataset = load_dataset("facebook/flores", "eng_Latn-ukr_Cyrl")[decode_subset]
+        dataset = load_dataset(
+            "facebook/flores", "eng_Latn-ukr_Cyrl", trust_remote_code=True
+        )[decode_subset]
         if indices is not None:
             dataset = dataset.select(indices)
         columns = ["id", "sentence_eng_Latn", "sentence_ukr_Cyrl"]

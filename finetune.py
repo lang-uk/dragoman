@@ -54,6 +54,9 @@ parser.add_argument(
 parser.add_argument(
     "--save_total_limit", default=5, type=int, help="Limit the total amount of checkpoints."
 )
+
+parser.add_argument("--resume_from_checkpoint", default=False, action="store_true")
+
 BatchTranslator.register(parser) # --exp, --prompt are here
 args = parser.parse_args()
 prompter = Prompter(args.prompt)
@@ -192,7 +195,7 @@ def main():
         optimizers=(optimizer, None),
     )
     model.config.use_cache = False
-    trainer.train(resume_from_checkpoint=False)
+    trainer.train(resume_from_checkpoint=args.resume_from_checkpoint)
 
     if args.save_total_limit > 0:
         model.save_pretrained(args.exp)
