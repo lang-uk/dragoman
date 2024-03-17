@@ -52,12 +52,18 @@ parser.add_argument(
     "--save_steps", default=50, type=int, help="Save checkpoints every X steps."
 )
 parser.add_argument(
-    "--save_total_limit", default=5, type=int, help="Limit the total amount of checkpoints."
+    "--save_total_limit",
+    default=5,
+    type=int,
+    help="Limit the total amount of checkpoints.",
 )
 
 parser.add_argument("--resume_from_checkpoint", default=False, action="store_true")
+parser.add_argument(
+    "--wandb_project", default="finetune_experiments", type=str, help="Wandb project."
+)
 
-BatchTranslator.register(parser) # --exp, --prompt are here
+BatchTranslator.register(parser)  # --exp, --prompt are here
 args = parser.parse_args()
 prompter = Prompter(args.prompt)
 
@@ -102,7 +108,7 @@ def tokenize(tokenizer, model_input_text: str, sep: str = "[/INST] "):
 
 
 def main():
-    wandb.init(project="finetune_experiments", config=vars(args))
+    wandb.init(project=args.wandb_project, config=vars(args))
 
     tokenizer = AutoTokenizer.from_pretrained(
         args.model_name_or_path,
@@ -126,8 +132,9 @@ def main():
     print("Using separator for conditional LM training:", prompter.separator)
 
     data = data.map(
-        lambda x: tokenize(tokenizer, x["text"], sep=prompter.separator), num_proc=40,
-        desc="Tokenizing"
+        lambda x: tokenize(tokenizer, x["text"], sep=prompter.separator),
+        num_proc=40,
+        desc="Tokenizing",
     )
 
     model = AutoModelForCausalLM.from_pretrained(
@@ -201,7 +208,7 @@ def main():
         model.save_pretrained(args.exp)
 
     if args.decode_beams:
-        print('Decoding FLORES', args.decode_subset)
+        print("Decoding FLORES", args.decode_subset)
         model = model.merge_and_unload()
         # TODO: maybe convert the whole thing to float16?
         model.gradient_checkpointing_disable()
@@ -209,16 +216,22 @@ def main():
             decode_beams=args.decode_beams,
             decode_batch_size=args.decode_batch_size,
             model=model,
-            tokenizer=BatchTranslator.load_tokenizer(BatchTranslator.get_base_model(args)),
-            prompter=prompter
+            tokenizer=BatchTranslator.load_tokenizer(
+                BatchTranslator.get_base_model(args)
+            ),
+            prompter=prompter,
         )
-        results = translator.decode_flores(exp=args.exp, decode_subset=args.decode_subset)
-        #results = translator.decode_flores(exp=args.exp, decode_subset=args.decode_subset, indices=range(2))
-        wandb.log({
-            'decode/bleu': results['score'],
-            'decode/ref_len': results['ref_len'],
-            'decode/hyp_len': results['sys_len'],
-        })
+        results = translator.decode_flores(
+            exp=args.exp, decode_subset=args.decode_subset
+        )
+        # results = translator.decode_flores(exp=args.exp, decode_subset=args.decode_subset, indices=range(2))
+        wandb.log(
+            {
+                "decode/bleu": results["score"],
+                "decode/ref_len": results["ref_len"],
+                "decode/hyp_len": results["sys_len"],
+            }
+        )
 
 
 def _mp_fn(index):
