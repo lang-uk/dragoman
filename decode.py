@@ -83,8 +83,9 @@ class BatchTranslator:
     @classmethod
     def get_base_model(self, args):
         path = Path(args.model_name_or_path)
+        exp = Path(args.exp)
         if path.is_dir():
-            return json.loads((path / 'adapter_config.json').read_text())['base_model_name_or_path']
+            return json.loads((exp / 'adapter_config.json').read_text())['base_model_name_or_path']
         else:
             return args.model_name_or_path
 
@@ -98,7 +99,7 @@ class BatchTranslator:
 
         peft_model = PeftModel.from_pretrained(
             model,
-            args.model_name_or_path,
+            args.exp,
             device_map="cuda",
         )
         peft_model = peft_model.merge_and_unload()
@@ -208,7 +209,9 @@ class BatchTranslator:
         return self.report(Path(exp) / f"beam{self.decode_beams}.wmt22test.jsonl", dataset)
 
     def decode_flores(self, exp: str, decode_subset: str, indices=None):
-        dataset = load_dataset("facebook/flores", "eng_Latn-ukr_Cyrl", trust_remote_code=True)[decode_subset]
+        dataset = load_dataset(
+            "facebook/flores", "eng_Latn-ukr_Cyrl", trust_remote_code=True
+        )[decode_subset]
         if indices is not None:
             dataset = dataset.select(indices)
         columns = ["id", "sentence_eng_Latn", "sentence_ukr_Cyrl"]
