@@ -1,0 +1,3 @@
+[submodule "data/gpt-MT"]
+	path = data/gpt-MT
+	url = https://github.com/microsoft/gpt-MT
