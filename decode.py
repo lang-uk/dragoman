@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 import evaluate
-from datasets import load_dataset
+from datasets import load_dataset, concatenate_datasets
 from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
 from transformers.generation import BeamSearchDecoderOnlyOutput
 from peft import PeftModel
@@ -71,7 +71,7 @@ class BatchTranslator:
             type=str,
             help="experiment directory: where to save the model",
         )
-        parser.add_argument("--decode_subset", default="dev", type=str, help="Dataset subset of FLORES to decode.")
+        parser.add_argument("--decode_subset", default=["dev", "devtest", "wmt22test"], type=str, help="Dataset decode: dev for FLORES dev, devtest for FLORES devtest, test for FLORES test, wmt22test for WMT22 test.")
         parser.add_argument("--decode_batch_size", default=1, type=int, help="Decoding batch size, should be small enough to accommodate all beams.")
         parser.add_argument("--decode_beams", default=10, type=int, help="Number of beams to use during decoding. Set to 0 to avoid decoding in the training loop.")
         parser.add_argument("--prompt", default="gracious", choices=["gracious", "basic"], type=str, help="Prompt style. Gracious uses a lot of words, basic uses [INST] [/INST].")
@@ -172,6 +172,42 @@ class BatchTranslator:
                 result['bleu'].append(sacrebleu.compute(predictions=[output], references=[ref])['score'])
         return result
 
+    def report(self, output_path, dataset):
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        dataset.to_json(output_path, force_ascii=False)
+
+        # measure top-1 bleu
+        dataset_top1 = dataset.filter(lambda x: x["rank"] == 0, load_from_cache_file=False)
+        results = sacrebleu.compute(predictions=dataset_top1["hyp"], references=dataset_top1["ref"])
+        output_path.with_suffix('.results').write_text(json.dumps(results, ensure_ascii=False))
+        print(results)
+
+        return results
+
+    def decode_wmt22(self, exp: str):
+        # https://github.com/huggingface/datasets/issues/4709
+        dataset = load_dataset("text", data_files={
+            "en": "data/wmt22/test.en-uk.en",
+            "uk": "data/wmt22/test.en-uk.uk",
+        })
+
+        dataset = concatenate_datasets([dataset["en"].rename_column("text", "source"),
+                                        dataset["uk"].rename_column("text", "target")], axis=1)
+        dataset = dataset.add_column("id", list(range(len(dataset))))
+
+        columns = ["id", "source", "target"]
+        dataset = dataset.select_columns(columns)
+        dataset = dataset.map(
+            self,
+            batched=True,
+            batch_size=self.decode_batch_size,
+            input_columns=columns,
+            remove_columns=columns,
+            load_from_cache_file=False,
+        )
+
+        return self.report(Path(exp) / f"beam{self.decode_beams}.wmt22test.jsonl", dataset)
+
     def decode_flores(self, exp: str, decode_subset: str, indices=None):
         dataset = load_dataset(
             "facebook/flores", "eng_Latn-ukr_Cyrl", trust_remote_code=True
@@ -189,20 +225,7 @@ class BatchTranslator:
             load_from_cache_file=False,
         )
 
-        exp = Path(exp)
-        exp.mkdir(parents=True, exist_ok=True)
-        output_path = exp / f"beam{self.decode_beams}.{decode_subset}.jsonl"
-
-        dataset.to_json(output_path, force_ascii=False)
-
-        # measure top-1 bleu
-        dataset_top1 = dataset.filter(lambda x: x["rank"] == 0, load_from_cache_file=False)
-        results = sacrebleu.compute(predictions=dataset_top1["hyp"], references=dataset_top1["ref"])
-        output_path.with_suffix('.results').write_text(json.dumps(results, ensure_ascii=False))
-        print(results)
-
-        return results
-
+        return self.report(Path(exp) / f"beam{self.decode_beams}.{decode_subset}.jsonl", dataset)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -210,4 +233,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     translator = BatchTranslator.from_args(args)
-    translator.decode_flores(exp=args.exp, decode_subset=args.decode_subset)
+    if "wmt22test" == args.decode_subset:
+        translator.decode_wmt22(exp=args.exp)
+    else:
+        translator.decode_flores(exp=args.exp, decode_subset=args.decode_subset)
