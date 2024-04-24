@@ -3,7 +3,7 @@
 This repository is an official implementation of paper [Setting up the Data Printer with Improved English to Ukrainian Machine Translation](https://arxiv.org/abs/2404.15196) (accepted to UNLP 2024 at LREC-Coling 2024).
 By using a two-phase data cleaning and data selection approach we have achieved SOTA performance on FLORES-101 English-Ukrainian devtest subset with **BLEU** `32.34`.
 
-  
+
 ## How to use
 
 We designed this model for sentence-level English -> Ukrainian translation.
@@ -67,14 +67,6 @@ and use `ggml-adapter-model.bin` from this repository like this:
 ./main -ngl 32 -m mistral-7b-v0.1.Q4_K_M.gguf --color -c 4096 --temp 0 --repeat_penalty 1.1 -n -1 -p "[INST] who holds this neighborhood? [/INST]" --lora ./ggml-adapter-model.bin
 ```
 
-### Training Dataset and Resources
-
-Training code: [lang-uk/dragoman](https://github.com/lang-uk/dragoman)  
-Cleaned Paracrawl: [lang-uk/paracrawl_3m](https://huggingface.co/datasets/lang-uk/paracrawl_3m)  
-Cleaned Multi30K: [lang-uk/multi30k-extended-17k](https://huggingface.co/datasets/lang-uk/multi30k-extended-17k)
-
-
-
 ### Benchmark Results against other models on FLORES-101 devset
 
 
@@ -95,6 +87,43 @@ Cleaned Multi30K: [lang-uk/multi30k-extended-17k](https://huggingface.co/dataset
 | NLLB 3B, 10 beams                           | 30.46               | 37.22       | 58.11    | 55.32      |
 | OPUS-MT, 10 beams                           | 32.2                | 39.76       | 60.23    | 57.38      |
 
+
+### Training Dataset and Resources
+
+#### Resulting Datasets
+Cleaned Paracrawl (first phase): [lang-uk/paracrawl_3m](https://huggingface.co/datasets/lang-uk/paracrawl_3m)  
+Cleaned Multi30K (second phase): [lang-uk/multi30k-extended-17k](https://huggingface.co/datasets/lang-uk/multi30k-extended-17k)
+
+
+#### Training steps
+
+For more details, please refer to the paper.
+
+1. First phase: Data Cleaning.
+2. Second phase: Unsupervised Data Selection using k-fold perplexity filtering.
+```bash
+# train 5 models on 5 folds
+python finetune_ppl.py --N 29_000 --run_type folds --prefix fold-training --lora_checkpoint exps/dragoman-p --lr 2e-5
+
+# calculate perplexity for OOB data
+python perplexity_evaluate.py --N 29_000 
+
+# apply perplexity filtering
+python ppl_analysis.py
+
+# train on the selected data
+python finetune_ppl.py --N 29_000 --run_type cleaned --prefix fold-training --lora_checkpoint exps/dragoman-p --lr 2e-5
+
+# train on the full data for compatison
+python finetune_ppl.py --N 29_000 --run_type full --prefix fold-training --lora_checkpoint exps/dragoman-p --lr 2e-5
+
+# evaluate on flores dev
+python decode.py --checkpoint exps/fold-training_epochs_1_lr_2e-05_R_128_ALPH_256_N_29000_full --subset dev
+
+# evaluate on flores devtest
+python decode.py --checkpoint exps/fold-training_epochs_1_lr_2e-05_R_128_ALPH_256_N_29000_full --subset devtest
+
+```
 
 ## Citation
 
