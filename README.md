@@ -1,7 +1,13 @@
 # Dragoman: SOTA English to Ukrainian Machine Translation
 
+[![Open In HF🤗 Space ](https://img.shields.io/badge/Open%20Demo-%F0%9F%A4%97%20Space-yellow)](https://huggingface.co/spaces/lang-uk/dragoman)
+[![Download model 🤗 ](https://img.shields.io/badge/Download%20Model-%F0%9F%A4%97%20Model-yellow)](https://huggingface.co/lang-uk/dragoman)
+
 This repository is an official implementation of paper [Setting up the Data Printer with Improved English to Ukrainian Machine Translation](https://arxiv.org/abs/2404.15196) (accepted to UNLP 2024 at LREC-Coling 2024).
 By using a two-phase data cleaning and data selection approach we have achieved SOTA performance on FLORES-101 English-Ukrainian devtest subset with **BLEU** `32.34`.
+
+
+#### Online demo: [https://huggingface.co/spaces/lang-uk/dragoman](https://huggingface.co/spaces/lang-uk/dragoman)
 
 
 ## How to use
