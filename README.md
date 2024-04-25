@@ -99,17 +99,23 @@ Cleaned Multi30K (second phase): [lang-uk/multi30k-extended-17k](https://hugging
 
 For more details, please refer to the paper.
 
-1. First phase: Data Cleaning.
-2. Second phase: Unsupervised Data Selection using k-fold perplexity filtering.
+1. First phase: Data Cleaning of [Paracrawl](https://huggingface.co/datasets/Helsinki-NLP/opus_paracrawl) dataset.
+2. Second phase: Unsupervised Data Selection using k-fold perplexity filtering on [Extended Multi30k-Uk](https://huggingface.co/datasets/turuta/Multi30k-uk).
 ```bash
-# train 5 models on 5 folds
+# export turuta/Multi30k-uk to a local dataset
+python download_dataset.py
+
+# generate k-folds for perplexity evaluation
+python generate_dataset.py --N 29_000 --dataset multi-30k-uk.jsonl
+
+# train 5 models on 5 folds, resume from previous phase
 python finetune_ppl.py --N 29_000 --run_type folds --prefix fold-training --lora_checkpoint exps/dragoman-p --lr 2e-5
 
 # calculate perplexity for OOB data
-python perplexity_evaluate.py --N 29_000 
+python perplexity_evaluate.py --N 29_000 --lr 2e-5 --prefix fold-training
 
 # apply perplexity filtering
-python ppl_analysis.py
+python ppl_analysis.py --threshold 60
 
 # train on the selected data
 python finetune_ppl.py --N 29_000 --run_type cleaned --prefix fold-training --lora_checkpoint exps/dragoman-p --lr 2e-5
