@@ -126,7 +126,7 @@ python ppl_analysis.py --threshold 60
 # train on the selected data
 python finetune_ppl.py --N 29_000 --run_type cleaned --prefix fold-training --lora_checkpoint exps/dragoman-p --lr 2e-5
 
-# train on the full data for compatison
+# train on the full data for comparison
 python finetune_ppl.py --N 29_000 --run_type full --prefix fold-training --lora_checkpoint exps/dragoman-p --lr 2e-5
 
 # evaluate on flores dev
