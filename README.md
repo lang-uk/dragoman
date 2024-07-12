@@ -139,7 +139,27 @@ python decode.py --checkpoint exps/fold-training_epochs_1_lr_2e-05_R_128_ALPH_25
 
 ## Citation
 
-TBD (accepted to UNLP 2024 at LREC-Coling 2024)
+```
+@inproceedings{paniv-etal-2024-setting,
+    title = "Setting up the Data Printer with Improved {E}nglish to {U}krainian Machine Translation",
+    author = "Paniv, Yurii  and
+      Chaplynskyi, Dmytro  and
+      Trynus, Nikita  and
+      Kyrylov, Volodymyr",
+    editor = "Romanyshyn, Mariana  and
+      Romanyshyn, Nataliia  and
+      Hlybovets, Andrii  and
+      Ignatenko, Oleksii",
+    booktitle = "Proceedings of the Third Ukrainian Natural Language Processing Workshop (UNLP) @ LREC-COLING 2024",
+    month = may,
+    year = "2024",
+    address = "Torino, Italia",
+    publisher = "ELRA and ICCL",
+    url = "https://aclanthology.org/2024.unlp-1.6",
+    pages = "41--50",
+    abstract = "To build large language models for Ukrainian we need to expand our corpora with large amounts of new algorithmic tasks expressed in natural language. Examples of task performance expressed in English are abundant, so with a high-quality translation system our community will be enabled to curate datasets faster. To aid this goal, we introduce a recipe to build a translation system using supervised finetuning of a large pretrained language model with a noisy parallel dataset of 3M pairs of Ukrainian and English sentences followed by a second phase of training using 17K examples selected by k-fold perplexity filtering on another dataset of higher quality. Our decoder-only model named Dragoman beats performance of previous state of the art encoder-decoder models on the FLORES devtest set.",
+}
+```
 
 
 ## Authors
