@@ -9,3 +9,4 @@ sacrebleu
 scipy
 smart-open
 wandb
+sentencepiece

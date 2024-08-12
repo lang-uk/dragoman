@@ -11,20 +11,24 @@ from transformers import (
     Trainer,
 )
 from peft import prepare_model_for_kbit_training, LoraConfig, get_peft_model
-import os
+import evaluate
 import wandb
 
 from decode import BatchTranslator, Prompter
+
+torch.manual_seed(3407)
 
 parser = argparse.ArgumentParser(
     "train loop", formatter_class=argparse.ArgumentDefaultsHelpFormatter
 )
 parser.add_argument(
     "--train",
-    default="data/processed/paracrawl_filtered_alpaca.jsonlines",
+    default="data/paracrawl_3m.jsonlines",
     type=str,
     help="A jsonlines file containing the training data.",
 )
+
+
 parser.add_argument(
     "--optimizer",
     default="adamw",
@@ -41,6 +45,7 @@ parser.add_argument(
     type=int,
     help="Gradient accumulation steps.",
 )
+
 parser.add_argument("--learning_rate", default=2e-5, type=float, help="Learning rate.")
 parser.add_argument("--lora_rank", default=256, type=int, help="LoRA adapter rank.")
 parser.add_argument("--lora_alpha", default=512, type=int, help="LoRA alpha.")
@@ -60,7 +65,7 @@ parser.add_argument(
 
 parser.add_argument("--resume_from_checkpoint", default=False, action="store_true")
 parser.add_argument(
-    "--wandb_project", default="finetune_experiments", type=str, help="Wandb project."
+    "--wandb_project", default="dragoman_return_of_jedi", type=str, help="Wandb project."
 )
 
 BatchTranslator.register(parser)  # --exp, --prompt are here
@@ -106,6 +111,31 @@ def tokenize(tokenizer, model_input_text: str, sep: str = "[/INST] "):
 
     return model_input
 
+def tokenize_eval(tokenizer, model_input_text: str):
+    def generate_prompt(instruction: str) -> str:
+        return f"[INST] {instruction} [/INST] "
+
+    # Tokenize the full model input
+    model_input = tokenizer(
+        generate_prompt(model_input_text),
+        padding=False,
+        return_tensors=None,
+    )
+
+    return model_input
+
+bleu = evaluate.load("sacrebleu")
+
+
+def compute_metrics(eval_pred):
+    print("============================")
+    print(eval_pred)
+    predictions, references = eval_pred
+    decoded_preds = [pred.strip() for pred in predictions]
+    decoded_refs = [[ref.strip()] for ref in references]
+    result = bleu.compute(predictions=decoded_preds, references=decoded_refs)
+    return {"bleu": result["score"]}
+
 
 def main():
     wandb.init(project=args.wandb_project, config=vars(args))
@@ -131,11 +161,30 @@ def main():
     print("First training example:", data[0])
     print("Using separator for conditional LM training:", prompter.separator)
 
+    eval_data = load_dataset(
+        "facebook/flores", "eng_Latn-ukr_Cyrl", trust_remote_code=True
+    )["dev"]
+
+    eval_data = eval_data.select_columns(
+        ["id", "sentence_eng_Latn", "sentence_ukr_Cyrl"]
+    )
+    eval_data = eval_data.rename_column("sentence_eng_Latn", "text")
+    eval_data = eval_data.rename_column("sentence_ukr_Cyrl", "translation")
+
     data = data.map(
         lambda x: tokenize(tokenizer, x["text"], sep=prompter.separator),
         num_proc=40,
         desc="Tokenizing",
     )
+
+    eval_data = eval_data.map(
+        lambda x: tokenize_eval(tokenizer, x["text"]),
+        num_proc=40,
+        desc="Tokenizing eval",
+    )
+
+    eval_data = eval_data.filter(lambda x: len(x["input_ids"]) < 32)
+    print(f"{len(eval_data)} eval examples after filtering")
 
     model = AutoModelForCausalLM.from_pretrained(
         args.model_name_or_path,
@@ -166,13 +215,16 @@ def main():
     model = get_peft_model(model, config)
 
     training_args = TrainingArguments(
+        # eval_steps=1,
+        # eval_strategy="steps",
+        # per_device_eval_batch_size=1,
         per_device_train_batch_size=args.per_device_train_batch_size,
         gradient_accumulation_steps=args.gradient_accumulation_steps,
         warmup_steps=100,
         num_train_epochs=1,
         learning_rate=args.learning_rate,
         fp16=True,
-        logging_steps=50,
+        logging_steps=args.save_steps,
         output_dir=args.exp,
         save_total_limit=args.save_total_limit,
         save_strategy="steps",
@@ -200,6 +252,8 @@ def main():
             pad_to_multiple_of=1,
         ),
         optimizers=(optimizer, None),
+        # compute_metrics=compute_metrics,
+        # eval_dataset=eval_data,
     )
     model.config.use_cache = False
     trainer.train(resume_from_checkpoint=args.resume_from_checkpoint)
