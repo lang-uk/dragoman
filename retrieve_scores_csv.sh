@@ -2,14 +2,30 @@
 
 # Check if the required parameters are provided
 if [ -z "$1" ] || [ -z "$2" ]; then
-    echo "Usage: $0 <experiment_directory> <subset>"
-    echo "Example: $0 /path/to/experiment_directory devtest"
+    echo "Usage: $0 <experiment_directory> <subset> [--decode_src_lang=<src_lang>] [--decode_tgt_lang=<tgt_lang>]"
+    echo "Example: $0 /path/to/experiment_directory devtest --decode_src_lang=eng_Latn --decode_tgt_lang=ukr_Cyrl"
     exit 1
 fi
 
 # Directory path and subset
 EXPERIMENT_DIR=$1
 SUBSET=$2
+
+# Default values for source and target languages
+DECODE_SRC_LANG="eng_Latn"
+DECODE_TGT_LANG="ukr_Cyrl"
+
+# Process additional parameters for source and target languages
+for param in "$@"; do
+    case $param in
+        --decode_src_lang=*)
+            DECODE_SRC_LANG="${param#*=}"
+            ;;
+        --decode_tgt_lang=*)
+            DECODE_TGT_LANG="${param#*=}"
+            ;;
+    esac
+done
 
 # Verify that the provided path is a valid directory
 if [ ! -d "$EXPERIMENT_DIR" ]; then
@@ -23,12 +39,19 @@ if [[ "$SUBSET" != "dev" && "$SUBSET" != "devtest" ]]; then
     exit 1
 fi
 
-# Find all beam10.SUBSET.results files in subdirectories of the experiment directory and sort them naturally
-result_files=$(find "$EXPERIMENT_DIR" -type f -name "beam10.$SUBSET.results" | sort -V)
+# Determine the result file name pattern based on the language parameters
+if [[ "$DECODE_SRC_LANG" == "eng_Latn" && "$DECODE_TGT_LANG" == "ukr_Cyrl" ]]; then
+    result_pattern="beam10.$SUBSET.results"
+else
+    result_pattern="beam10.$SUBSET.$DECODE_SRC_LANG-$DECODE_TGT_LANG.results"
+fi
+
+# Find all result files in subdirectories of the experiment directory and sort them naturally
+result_files=$(find "$EXPERIMENT_DIR" -type f -name "$result_pattern" | sort -V)
 
 # Check if any result files were found
 if [ -z "$result_files" ]; then
-    echo "No beam10.$SUBSET.results files found in the specified directory."
+    echo "No $result_pattern files found in the specified directory."
     exit 0
 fi
 
@@ -74,4 +97,3 @@ else
 fi
 
 echo "Results saved to $csv_file"
-

@@ -62,6 +62,11 @@ parser.add_argument(
     help="Limit the total amount of checkpoints.",
 )
 
+parser.add_argument(
+    "--epochs", default=1, type=int, help="Number of training epochs."
+)
+
+
 parser.add_argument("--resume_from_checkpoint", default=False, action="store_true")
 parser.add_argument(
     "--wandb_project", default="dragoman_return_of_jedi", type=str, help="Wandb project."
@@ -173,7 +178,7 @@ def main():
         per_device_train_batch_size=args.per_device_train_batch_size,
         gradient_accumulation_steps=args.gradient_accumulation_steps,
         warmup_steps=100,
-        num_train_epochs=1,
+        num_train_epochs=args.epochs,
         learning_rate=args.learning_rate,
         fp16=True,
         logging_steps=args.save_steps,

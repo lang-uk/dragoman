@@ -2,14 +2,30 @@
 
 # Check if the required parameters are provided
 if [ -z "$1" ] || [ -z "$2" ]; then
-    echo "Usage: $0 <directory_path> <subset>"
-    echo "Example: $0 /path/to/checkpoints devtest"
+    echo "Usage: $0 <directory_path> <subset> [--decode_src_lang=<src_lang>] [--decode_tgt_lang=<tgt_lang>]"
+    echo "Example: $0 /path/to/checkpoints devtest --decode_src_lang=eng_Latn --decode_tgt_lang=ukr_Cyrl"
     exit 1
 fi
 
 # Directory path and subset
 DIR_PATH=$1
 SUBSET=$2
+
+# Default values for source and target languages
+DECODE_SRC_LANG="eng_Latn"
+DECODE_TGT_LANG="ukr_Cyrl"
+
+# Process additional parameters for source and target languages
+for param in "$@"; do
+    case $param in
+        --decode_src_lang=*)
+            DECODE_SRC_LANG="${param#*=}"
+            ;;
+        --decode_tgt_lang=*)
+            DECODE_TGT_LANG="${param#*=}"
+            ;;
+    esac
+done
 
 # Verify that the provided path is a valid directory
 if [ ! -d "$DIR_PATH" ]; then
@@ -45,7 +61,9 @@ for CHECKPOINT_DIR in $CHECKPOINT_DIRS; do
             --decode_beams 10 \
             --decode_batch_size 1 \
             --prompt basic \
-            --model_name_or_path mistralai/Mistral-7B-v0.3
+            --model_name_or_path mistralai/Mistral-7B-v0.3 \
+            --decode_src_lang "$DECODE_SRC_LANG" \
+            --decode_tgt_lang "$DECODE_TGT_LANG"
     else
         echo "Results already exist for $CHECKPOINT_DIR, skipping..."
     fi
