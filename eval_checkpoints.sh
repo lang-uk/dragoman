@@ -2,8 +2,8 @@
 
 # Check if the required parameters are provided
 if [ -z "$1" ] || [ -z "$2" ]; then
-    echo "Usage: $0 <directory_path> <subset> [--decode_src_lang=<src_lang>] [--decode_tgt_lang=<tgt_lang>]"
-    echo "Example: $0 /path/to/checkpoints devtest --decode_src_lang=eng_Latn --decode_tgt_lang=ukr_Cyrl"
+    echo "Usage: $0 <directory_path> <subset> [--decode_src_lang=<src_lang>] [--decode_tgt_lang=<tgt_lang>] [--cuda_devices=<devices>]"
+    echo "Example: $0 /path/to/checkpoints devtest --decode_src_lang=eng_Latn --decode_tgt_lang=ukr_Cyrl --cuda_devices=0"
     exit 1
 fi
 
@@ -14,8 +14,9 @@ SUBSET=$2
 # Default values for source and target languages
 DECODE_SRC_LANG="eng_Latn"
 DECODE_TGT_LANG="ukr_Cyrl"
+CUDA_DEVICES="1"  # Default value for CUDA_VISIBLE_DEVICES
 
-# Process additional parameters for source and target languages
+# Process additional parameters for source, target languages, and CUDA devices
 for param in "$@"; do
     case $param in
         --decode_src_lang=*)
@@ -23,6 +24,9 @@ for param in "$@"; do
             ;;
         --decode_tgt_lang=*)
             DECODE_TGT_LANG="${param#*=}"
+            ;;
+        --cuda_devices=*)
+            CUDA_DEVICES="${param#*=}"
             ;;
     esac
 done
@@ -55,7 +59,7 @@ for CHECKPOINT_DIR in $CHECKPOINT_DIRS; do
         echo "Running decode command for $CHECKPOINT_DIR..."
 
         # Execute the command with the specified environment variable and parameters
-        env CUDA_VISIBLE_DEVICES=1 python -m decode \
+        env CUDA_VISIBLE_DEVICES=$CUDA_DEVICES python -m decode \
             --exp "$CHECKPOINT_DIR" \
             --decode_subset "$SUBSET" \
             --decode_beams 10 \
