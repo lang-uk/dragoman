@@ -40,7 +40,7 @@ if [[ "$SUBSET" != "dev" && "$SUBSET" != "devtest" ]]; then
 fi
 
 # List all checkpoint directories, sorted naturally
-CHECKPOINT_DIRS=$(ls -d $DIR_PATH/checkpoint-* 2>/dev/null | sort -V)
+CHECKPOINT_DIRS=$(ls -d $DIR_PATH/checkpoint-* 2>/dev/null | sort -V -r)
 
 # Check if there are no checkpoint directories
 if [ -z "$CHECKPOINT_DIRS" ]; then

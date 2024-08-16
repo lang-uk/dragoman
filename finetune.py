@@ -117,7 +117,14 @@ def tokenize(tokenizer, model_input_text: str, sep: str = "[/INST] "):
 
 
 def main():
-    wandb.init(project=args.wandb_project, config=vars(args))
+    exp_name = (
+        f"{args.exp.replace('/', '__')}-{datetime.now().strftime('%Y-%m-%d-%H-%M')}"
+    )
+    wandb.init(
+        project=args.wandb_project,
+        config=vars(args),
+        name=exp_name,
+    )
 
     tokenizer = AutoTokenizer.from_pretrained(
         args.model_name_or_path,
@@ -187,7 +194,7 @@ def main():
         save_strategy="steps",
         save_steps=args.save_steps,
         report_to="wandb",
-        run_name=f"{args.exp}-{datetime.now().strftime('%Y-%m-%d-%H-%M')}",
+        run_name=exp_name,
     )
 
     if args.optimizer == "sophiag":
