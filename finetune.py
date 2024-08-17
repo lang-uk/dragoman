@@ -1,5 +1,6 @@
 import argparse
 import torch
+from pathlib import Path
 from datetime import datetime
 from datasets import load_dataset
 from transformers import (
@@ -15,7 +16,7 @@ import wandb
 
 from decode import BatchTranslator, Prompter
 
-torch.manual_seed(3407)
+# torch.manual_seed(3407)
 
 parser = argparse.ArgumentParser(
     "train loop", formatter_class=argparse.ArgumentDefaultsHelpFormatter
@@ -117,9 +118,8 @@ def tokenize(tokenizer, model_input_text: str, sep: str = "[/INST] "):
 
 
 def main():
-    exp_name = (
-        f"{args.exp.replace('/', '__')}-{datetime.now().strftime('%Y-%m-%d-%H-%M')}"
-    )
+    exp_folder = Path(args.exp)
+    exp_name = f"{exp_folder.name}-{datetime.now().strftime('%Y-%m-%d-%H-%M')}"
     wandb.init(
         project=args.wandb_project,
         config=vars(args),
