@@ -1,3 +1,7 @@
+"""
+Export sentences from TMX/XML files to a JSONL file for all the languages
+"""
+
 import os
 import json
 import argparse
