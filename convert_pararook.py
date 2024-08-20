@@ -20,7 +20,8 @@ def main(args) -> None:
     for line in tqdm(args.input_file):
         data = json.loads(line)
         instruction = f"[INST] {data[source_lang]} [/INST] {data[target_lang]}"
-        args.output_file.write(json.dumps({"text": instruction}, ensure_ascii=False) + "\n")
+        if len(instruction) <= args.max_length:
+            args.output_file.write(json.dumps({"text": instruction}, ensure_ascii=False) + "\n")
 
     args.input_file.close()
     args.output_file.close()
@@ -36,6 +37,12 @@ if __name__ == "__main__":
         "lang_pair",
         type=str,
         choices=["en-uk", "uk-en"],
+    )
+    parser.add_argument(
+        "--max-length", 
+        type=int,
+        default=1024,
+        help="Skip instructions longer than this length"
     )
     parser.add_argument(
         "output_file", type=argparse.FileType("w"), help="Output file in JSONL format"
