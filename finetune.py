@@ -129,7 +129,7 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(
         args.model_name_or_path,
         model_max_length=args.model_max_length,
-        use_fast=False,
+        use_fast=True,
         padding_side="right",
         add_eos_token=True,
         add_bos_token=False,

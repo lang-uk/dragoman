@@ -153,7 +153,7 @@ class BatchTranslator:
         tokenizer = AutoTokenizer.from_pretrained(
             base_model,
             model_max_length=model_max_length,
-            use_fast=False,
+            use_fast=True,
             add_eos_token=False,
             add_bos_token=False,
             pad_token="<s>",
