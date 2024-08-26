@@ -62,7 +62,7 @@ fi
 # Loop through each checkpoint directory
 for CHECKPOINT_DIR in $CHECKPOINT_DIRS; do
     # Check if the results file for the specified subset exists
-    if [ ! -f "$CHECKPOINT_DIR/beam10.$SUBSET.results" ]; then
+    if [ ! -f "$CHECKPOINT_DIR/beam10.$SUBSET.$DECODE_SRC_LANG-$DECODE_TGT_LANG.results" ]; then
         echo "Running decode command for $CHECKPOINT_DIR..."
 
         # Execute the command with the specified environment variable and parameters
