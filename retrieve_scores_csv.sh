@@ -41,9 +41,9 @@ fi
 
 # Determine the result file name pattern based on the language parameters
 if [[ "$DECODE_SRC_LANG" == "eng_Latn" && "$DECODE_TGT_LANG" == "ukr_Cyrl" ]]; then
-    result_pattern="beam10.$SUBSET.results"
+    result_pattern="beam10.$SUBSET.fixed.results"
 else
-    result_pattern="beam10.$SUBSET.$DECODE_SRC_LANG-$DECODE_TGT_LANG.results"
+    result_pattern="beam10.$SUBSET.$DECODE_SRC_LANG-$DECODE_TGT_LANG.fixed.results"
 fi
 
 # Find all result files in subdirectories of the experiment directory and sort them naturally

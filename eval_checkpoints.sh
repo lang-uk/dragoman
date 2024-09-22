@@ -11,9 +11,14 @@ fi
 DIR_PATH=$1
 SUBSET=$2
 
+# Constants for default source and target languages
+DEFAULT_DECODE_SRC_LANG="eng_Latn"
+DEFAULT_DECODE_TGT_LANG="ukr_Cyrl"
+
 # Default values for source and target languages, CUDA devices, and model name
-DECODE_SRC_LANG="eng_Latn"
-DECODE_TGT_LANG="ukr_Cyrl"
+DECODE_SRC_LANG="$DEFAULT_DECODE_SRC_LANG"
+DECODE_TGT_LANG="$DEFAULT_DECODE_TGT_LANG"
+
 CUDA_DEVICES="1"  # Default value for CUDA_VISIBLE_DEVICES
 MODEL_NAME="mistralai/Mistral-7B-v0.3"  # Default model name
 
@@ -61,21 +66,42 @@ fi
 
 # Loop through each checkpoint directory
 for CHECKPOINT_DIR in $CHECKPOINT_DIRS; do
-    # Check if the results file for the specified subset exists
-    if [ ! -f "$CHECKPOINT_DIR/beam10.$SUBSET.$DECODE_SRC_LANG-$DECODE_TGT_LANG.results" ]; then
-        echo "Running decode command for $CHECKPOINT_DIR..."
+    # Check for result file based on source and target language defaults
+    if [[ "$DECODE_SRC_LANG" == "$DEFAULT_DECODE_SRC_LANG" && "$DECODE_TGT_LANG" == "$DEFAULT_DECODE_TGT_LANG" ]]; then
+        # Check if the default results file exists
+        if [ ! -f "$CHECKPOINT_DIR/beam10.$SUBSET.fixed.results" ]; then
+            echo "Running decode command for $CHECKPOINT_DIR (default src/tgt languages)..."
 
-        # Execute the command with the specified environment variable and parameters
-        python -m decode \
-            --exp "$CHECKPOINT_DIR" \
-            --decode_subset "$SUBSET" \
-            --decode_beams 10 \
-            --decode_batch_size 1 \
-            --prompt basic \
-            --model_name_or_path "$MODEL_NAME" \
-            --decode_src_lang "$DECODE_SRC_LANG" \
-            --decode_tgt_lang "$DECODE_TGT_LANG"
+            # Execute the decode command with default src/tgt language setup
+            python -m decode \
+                --exp "$CHECKPOINT_DIR" \
+                --decode_subset "$SUBSET" \
+                --decode_beams 10 \
+                --decode_batch_size 1 \
+                --prompt basic \
+                --model_name_or_path "$MODEL_NAME" \
+                --decode_src_lang "$DECODE_SRC_LANG" \
+                --decode_tgt_lang "$DECODE_TGT_LANG"
+        else
+            echo "Results already exist for $CHECKPOINT_DIR (default src/tgt languages), skipping..."
+        fi
     else
-        echo "Results already exist for $CHECKPOINT_DIR, skipping..."
+        # Check if the custom language results file exists
+        if [ ! -f "$CHECKPOINT_DIR/beam10.$SUBSET.$DECODE_SRC_LANG-$DECODE_TGT_LANG.fixed.results" ]; then
+            echo "Running decode command for $CHECKPOINT_DIR (custom src/tgt languages: $DECODE_SRC_LANG -> $DECODE_TGT_LANG)..."
+
+            # Execute the decode command with custom src/tgt language setup
+            python -m decode \
+                --exp "$CHECKPOINT_DIR" \
+                --decode_subset "$SUBSET" \
+                --decode_beams 10 \
+                --decode_batch_size 1 \
+                --prompt basic \
+                --model_name_or_path "$MODEL_NAME" \
+                --decode_src_lang "$DECODE_SRC_LANG" \
+                --decode_tgt_lang "$DECODE_TGT_LANG"
+        else
+            echo "Results already exist for $CHECKPOINT_DIR (custom src/tgt languages: $DECODE_SRC_LANG -> $DECODE_TGT_LANG), skipping..."
+        fi
     fi
 done
