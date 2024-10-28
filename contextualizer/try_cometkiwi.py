@@ -127,6 +127,9 @@ def main(
 
                         f.flush()
 
+                    if end_at is not None and curr_idx >= end_at:
+                        break
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
