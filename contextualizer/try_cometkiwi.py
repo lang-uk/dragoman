@@ -97,9 +97,10 @@ def main(
                             curr_idx += 1
                             continue
 
-                        curr_idx += 1
                         if end_at is not None and curr_idx >= end_at:
                             break
+
+                        curr_idx += 1
 
                         orig = sent[src_lang]
                         trans = sent[tgt_lang]
