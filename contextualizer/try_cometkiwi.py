@@ -89,7 +89,7 @@ def main(
     with logging_redirect_tqdm():
         with smart_open.open(output_file, "w", encoding="utf-8") as f:
             with tqdm(desc="Writing sentences") as pbar_sentences:
-                for sent_pack in batched(parse_xml_file(input_file), 100 * batch_size):
+                for sent_pack in batched(parse_xml_file(input_file), 200 * batch_size):
                     documents = []
                     hashes = []
                     for sent in sent_pack:
