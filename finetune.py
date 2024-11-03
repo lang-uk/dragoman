@@ -1,5 +1,6 @@
 import argparse
 import torch
+from pathlib import Path
 from datetime import datetime
 from datasets import load_dataset
 from transformers import (
@@ -11,20 +12,23 @@ from transformers import (
     Trainer,
 )
 from peft import prepare_model_for_kbit_training, LoraConfig, get_peft_model
-import os
 import wandb
 
 from decode import BatchTranslator, Prompter
+
+# torch.manual_seed(3407)
 
 parser = argparse.ArgumentParser(
     "train loop", formatter_class=argparse.ArgumentDefaultsHelpFormatter
 )
 parser.add_argument(
     "--train",
-    default="data/processed/paracrawl_filtered_alpaca.jsonlines",
+    default="data/paracrawl_3m.jsonlines",
     type=str,
     help="A jsonlines file containing the training data.",
 )
+
+
 parser.add_argument(
     "--optimizer",
     default="adamw",
@@ -41,6 +45,7 @@ parser.add_argument(
     type=int,
     help="Gradient accumulation steps.",
 )
+
 parser.add_argument("--learning_rate", default=2e-5, type=float, help="Learning rate.")
 parser.add_argument("--lora_rank", default=256, type=int, help="LoRA adapter rank.")
 parser.add_argument("--lora_alpha", default=512, type=int, help="LoRA alpha.")
@@ -58,9 +63,14 @@ parser.add_argument(
     help="Limit the total amount of checkpoints.",
 )
 
+parser.add_argument(
+    "--epochs", default=1, type=int, help="Number of training epochs."
+)
+
+
 parser.add_argument("--resume_from_checkpoint", default=False, action="store_true")
 parser.add_argument(
-    "--wandb_project", default="finetune_experiments", type=str, help="Wandb project."
+    "--wandb_project", default="dragoman_return_of_jedi", type=str, help="Wandb project."
 )
 
 BatchTranslator.register(parser)  # --exp, --prompt are here
@@ -108,12 +118,18 @@ def tokenize(tokenizer, model_input_text: str, sep: str = "[/INST] "):
 
 
 def main():
-    wandb.init(project=args.wandb_project, config=vars(args))
+    exp_folder = Path(args.exp)
+    exp_name = f"{exp_folder.name}-{datetime.now().strftime('%Y-%m-%d-%H-%M')}"
+    wandb.init(
+        project=args.wandb_project,
+        config=vars(args),
+        name=exp_name,
+    )
 
     tokenizer = AutoTokenizer.from_pretrained(
         args.model_name_or_path,
         model_max_length=args.model_max_length,
-        use_fast=False,
+        use_fast=True,
         padding_side="right",
         add_eos_token=True,
         add_bos_token=False,
@@ -169,16 +185,16 @@ def main():
         per_device_train_batch_size=args.per_device_train_batch_size,
         gradient_accumulation_steps=args.gradient_accumulation_steps,
         warmup_steps=100,
-        num_train_epochs=1,
+        num_train_epochs=args.epochs,
         learning_rate=args.learning_rate,
         fp16=True,
-        logging_steps=50,
+        logging_steps=args.save_steps,
         output_dir=args.exp,
         save_total_limit=args.save_total_limit,
         save_strategy="steps",
         save_steps=args.save_steps,
         report_to="wandb",
-        run_name=f"{args.exp}-{datetime.now().strftime('%Y-%m-%d-%H-%M')}",
+        run_name=exp_name,
     )
 
     if args.optimizer == "sophiag":

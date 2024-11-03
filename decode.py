@@ -9,13 +9,14 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
 from transformers.generation import BeamSearchDecoderOnlyOutput
 from peft import PeftModel
 import torch
+
 sacrebleu = evaluate.load("sacrebleu")
 
 
 def batched(iterable, n):
     # batched('ABCDEFG', 3) --> ABC DEF G
     if n < 1:
-        raise ValueError('n must be at least one')
+        raise ValueError("n must be at least one")
     it = iter(iterable)
     while batch := tuple(islice(it, n)):
         yield batch
@@ -33,14 +34,16 @@ class Prompter:
             raise ValueError(f"Unknown prompt style: {prompt}")
 
     def generate_gracious_prompt(self, instruction: str) -> str:
-        return  f"Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request. ### Instruction: Respond with Ukrainian translations of English input. ### Input: {instruction} ### Response: "
+        return f"Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request. ### Instruction: Respond with Ukrainian translations of English input. ### Input: {instruction} ### Response: "
 
     def generate_basic_prompt(self, instruction: str) -> str:
         return f"[INST] {instruction} [/INST] "
 
 
 class BatchTranslator:
-    def __init__(self, *, decode_beams: int, decode_batch_size: int, model, tokenizer, prompter):
+    def __init__(
+        self, *, decode_beams: int, decode_batch_size: int, model, tokenizer, prompter
+    ):
         self.decode_beams = decode_beams
         self.decode_batch_size = decode_batch_size
         self.model = model
@@ -71,21 +74,60 @@ class BatchTranslator:
             type=str,
             help="experiment directory: where to save the model",
         )
-        parser.add_argument("--decode_subset", default="dev", type=str, help="Dataset subset of FLORES to decode.")
-        parser.add_argument("--decode_batch_size", default=1, type=int, help="Decoding batch size, should be small enough to accommodate all beams.")
-        parser.add_argument("--decode_beams", default=10, type=int, help="Number of beams to use during decoding. Set to 0 to avoid decoding in the training loop.")
-        parser.add_argument("--prompt", default="gracious", choices=["gracious", "basic"], type=str, help="Prompt style. Gracious uses a lot of words, basic uses [INST] [/INST].")
+        parser.add_argument(
+            "--decode_subset",
+            default="dev",
+            type=str,
+            help="Dataset subset of FLORES to decode.",
+        )
+        parser.add_argument(
+            "--decode_batch_size",
+            default=1,
+            type=int,
+            help="Decoding batch size, should be small enough to accommodate all beams.",
+        )
+        parser.add_argument(
+            "--decode_beams",
+            default=10,
+            type=int,
+            help="Number of beams to use during decoding. Set to 0 to avoid decoding in the training loop.",
+        )
+        parser.add_argument(
+            "--prompt",
+            default="gracious",
+            choices=["gracious", "basic"],
+            type=str,
+            help="Prompt style. Gracious uses a lot of words, basic uses [INST] [/INST].",
+        )
+        parser.add_argument(
+            "--decode_src_lang",
+            default="eng_Latn",
+        )
+        parser.add_argument(
+            "--decode_tgt_lang",
+            default="ukr_Cyrl",
+        )
 
     @classmethod
     def make_result(cls):
-        return {'id': [], 'rank': [], 'logprob': [], 'src': [], 'hyp': [], 'ref': [], 'bleu': []}
+        return {
+            "id": [],
+            "rank": [],
+            "logprob": [],
+            "src": [],
+            "hyp": [],
+            "ref": [],
+            "bleu": [],
+        }
 
     @classmethod
     def get_base_model(self, args):
         path = Path(args.model_name_or_path)
         exp = Path(args.exp)
         if path.is_dir():
-            return json.loads((exp / 'adapter_config.json').read_text())['base_model_name_or_path']
+            return json.loads((exp / "adapter_config.json").read_text())[
+                "base_model_name_or_path"
+            ]
         else:
             return args.model_name_or_path
 
@@ -111,7 +153,7 @@ class BatchTranslator:
         tokenizer = AutoTokenizer.from_pretrained(
             base_model,
             model_max_length=model_max_length,
-            use_fast=False,
+            use_fast=True,
             add_eos_token=False,
             add_bos_token=False,
             pad_token="<s>",
@@ -124,7 +166,7 @@ class BatchTranslator:
         inputs = self.tokenizer(
             [self.prompter.generate_prompt(source) for source in sources],
             return_tensors="pt",
-            padding=True
+            padding=True,
         )
         outputs: BeamSearchDecoderOnlyOutput = self.model.generate(
             input_ids=inputs["input_ids"].cuda(),
@@ -137,24 +179,25 @@ class BatchTranslator:
                 eos_token_id=self.tokenizer.eos_token_id,
                 num_beams=self.decode_beams,
                 num_return_sequences=self.decode_beams,
-                #num_beam_groups=self.decode_beams//5,
+                # num_beam_groups=self.decode_beams//5,
             ),
         )
 
         logprobs = self.model.compute_transition_scores(
-            outputs.sequences, outputs.scores, outputs.beam_indices,
-            normalize_logits=True
+            outputs.sequences,
+            outputs.scores,
+            outputs.beam_indices,
+            normalize_logits=True,
         ).sum(dim=-1)
         # output_length = np.sum(transition_scores.numpy() < 0, axis=1)
 
-        strings = self.tokenizer.batch_decode(outputs.sequences, skip_special_tokens=True)
+        strings = self.tokenizer.batch_decode(
+            outputs.sequences, skip_special_tokens=True
+        )
 
         result = self.make_result()
         for example_id, src, ref, batch in zip(
-            ids,
-            sources,
-            references,
-            batched(zip(logprobs, strings), self.decode_beams)
+            ids, sources, references, batched(zip(logprobs, strings), self.decode_beams)
         ):
             for rank, (logprob, output) in enumerate(batch):
                 if self.prompter.separator in output:
@@ -163,22 +206,31 @@ class BatchTranslator:
                 else:
                     output = f"##ERROR: did not find separator {self.prompter.separator} in the output"
                 print(example_id, logprob.item(), output)
-                result['id'].append(example_id)
-                result['rank'].append(rank)
-                result['logprob'].append(logprob.item())
-                result['src'].append(src)
-                result['ref'].append(ref)
-                result['hyp'].append(output)
-                result['bleu'].append(sacrebleu.compute(predictions=[output], references=[ref])['score'])
+                result["id"].append(example_id)
+                result["rank"].append(rank)
+                result["logprob"].append(logprob.item())
+                result["src"].append(src)
+                result["ref"].append(ref)
+                result["hyp"].append(output)
+                result["bleu"].append(
+                    sacrebleu.compute(predictions=[output], references=[ref])["score"]
+                )
         return result
 
-    def decode_flores(self, exp: str, decode_subset: str, indices=None):
+    def decode_flores(
+        self,
+        exp: str,
+        decode_subset: str,
+        indices=None,
+        src_lang="eng_Latn",
+        tgt_lang="ukr_Cyrl",
+    ):
         dataset = load_dataset(
-            "facebook/flores", "eng_Latn-ukr_Cyrl", trust_remote_code=True
+            "facebook/flores", f"{src_lang}-{tgt_lang}", trust_remote_code=True
         )[decode_subset]
         if indices is not None:
             dataset = dataset.select(indices)
-        columns = ["id", "sentence_eng_Latn", "sentence_ukr_Cyrl"]
+        columns = ["id", f"sentence_{src_lang}", f"sentence_{tgt_lang}"]
         dataset = dataset.select_columns(columns)
         dataset = dataset.map(
             self,
@@ -191,14 +243,27 @@ class BatchTranslator:
 
         exp = Path(exp)
         exp.mkdir(parents=True, exist_ok=True)
-        output_path = exp / f"beam{self.decode_beams}.{decode_subset}.jsonl"
+
+        if src_lang != "eng_Latn" or tgt_lang != "ukr_Cyrl":
+            output_path = (
+                exp
+                / f"beam{self.decode_beams}.{decode_subset}.{src_lang}-{tgt_lang}.jsonl"
+            )
+        else:
+            output_path = exp / f"beam{self.decode_beams}.{decode_subset}.jsonl"
 
         dataset.to_json(output_path, force_ascii=False)
 
         # measure top-1 bleu
-        dataset_top1 = dataset.filter(lambda x: x["rank"] == 0, load_from_cache_file=False)
-        results = sacrebleu.compute(predictions=dataset_top1["hyp"], references=dataset_top1["ref"])
-        output_path.with_suffix('.results').write_text(json.dumps(results, ensure_ascii=False))
+        dataset_top1 = dataset.filter(
+            lambda x: x["rank"] == 0, load_from_cache_file=False
+        )
+        results = sacrebleu.compute(
+            predictions=dataset_top1["hyp"], references=dataset_top1["ref"]
+        )
+        output_path.with_suffix(".results").write_text(
+            json.dumps(results, ensure_ascii=False)
+        )
         print(results)
 
         return results
@@ -210,4 +275,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     translator = BatchTranslator.from_args(args)
-    translator.decode_flores(exp=args.exp, decode_subset=args.decode_subset)
+    translator.decode_flores(
+        exp=args.exp,
+        decode_subset=args.decode_subset,
+        src_lang=args.decode_src_lang,
+        tgt_lang=args.decode_tgt_lang,
+    )
